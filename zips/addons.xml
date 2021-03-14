@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addons>
+<addon id="repository.bang" name="Bang" version="1.0" provider-name="Bang">
+	<extension point="xbmc.addon.repository" name="Bang">
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bang/master/zips/addons.xml</info>
+			<checksum>https://raw.githubusercontent.com/hidemyassbaby/repository.bang/master/zips/addons.xml.md5</checksum>
+			<datadir zip="true">https://raw.githubusercontent.com/hidemyassbaby/repository.bang/master/zips/</datadir>
+		</dir>
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/jsergio123/zips/master/addons.xml</info>
+			<checksum>https://raw.githubusercontent.com/jsergio123/zips/master/addons.xml.md5</checksum>
+			<datadir zip="true">https://raw.githubusercontent.com/jsergio123/zips/master/</datadir>
+		</dir>
+      	<dir>
+            <info compressed="false">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/</datadir>
+        </dir>
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/</datadir>
+		</dir>
+	</extension>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en"></summary>
+		<description lang="en">Bang Bang Bang Bang</description>
+		<genre></genre>
+	</extension>
+</addon>
+
+<addon id="resource.images.skinbackgrounds.xonfluencenzbuildandroid" name="Skin Backgrounds NZ Build Android" version="4.1" provider-name="">
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack NZ Build Android</summary>
+		<description lang="en">Skin Backgrounds Pack NZ Build Android</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
+<addon id="resource.images.skinbackgrounds.xonfluencenzbuildpc" name="Skin Backgrounds NZ Build PC" version="4.1" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack NZ Build PC</summary>
+		<description lang="en">Skin Backgrounds Pack NZ Build PC</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+</addons>
