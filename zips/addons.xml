@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
-<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="1.8" provider-name="Bang">
+<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="2.0" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0" />
         <import addon="script.module.requests" />
@@ -16,7 +16,7 @@
 
     <extension point="xbmc.addon.metadata">
         <summary lang="en">Bang Wizard</summary>
-        <description lang="en">Bang Wizard</description>
+        <description lang="en">Bang Wizard Works on v19</description>
         <platform>all</platform>
         <reuselanguageinvoker>false</reuselanguageinvoker>
         <assets>
