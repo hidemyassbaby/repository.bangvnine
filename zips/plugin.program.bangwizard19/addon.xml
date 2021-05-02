@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.program.bangwizard19" name="Bang Wizard" version="3.5" provider-name="Bang Wizard">
+<addon id="plugin.program.bangwizard19" name="Bang Wizard" version="3.6" provider-name="Bang Wizard">
     <requires>
         <import addon="xbmc.python" version="3.0.0" />
         <import addon="script.module.requests" />
