@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="repository.bangvnine" name="Bang v19" version="1.4" provider-name="Bang">
+<addon id="repository.bangvnine" name="Bang" version="8.1" provider-name="Bang">
 	<extension point="xbmc.addon.repository" name="Bang">
 		<dir>
 			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/addons.xml</info>
@@ -24,7 +24,7 @@
 	</extension>
 	<extension point="xbmc.addon.metadata">
 		<summary lang="en"></summary>
-		<description lang="en">Bang Bang Bang Bang v19 Only</description>
+		<description lang="en">Bang Bang Bang Bang v19</description>
 		<genre></genre>
 	</extension>
 </addon>
