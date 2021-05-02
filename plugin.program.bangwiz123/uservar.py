@@ -15,7 +15,7 @@ ART = os.path.join(PATH, 'resources', 'media')
 #########################################################
 ADDONTITLE = 'Bang Wizard'
 BUILDERNAME = 'Bang Wizard'
-EXCLUDES = [ADDON_ID, 'repository.openwizard']
+EXCLUDES = [ADDON_ID, 'repository.bangvnine']
 # Text File with build info in it. Please read https://github.com/a4k-openproject/plugin.program.openwizard/wiki/Installing-Builds
 BUILDFILE = 'https://raw.githubusercontent.com/hidemyassbaby/wizland/master/wizmenu.txt'
 # How often you would like it to check for build updates in days
@@ -41,18 +41,18 @@ ADVANCEDFILE = 'http://'
 # Example:  ICONMAINT     = os.path.join(ART, 'mainticon.png')
 #           ICONSETTINGS  = 'https://www.yourhost.com/repo/wizard/settings.png'
 # Leave as http:// for default icon
-ICONBUILDS = os.path.join(ART, 'builds.png')
-ICONMAINT = os.path.join(ART, 'maintenance.png')
-ICONSPEED = os.path.join(ART, 'speed.png')
-ICONAPK = os.path.join(ART, 'apkinstaller.png')
-ICONADDONS = os.path.join(ART, 'addoninstaller.png')
-ICONYOUTUBE = os.path.join(ART, 'youtube.png')
-ICONSAVE = os.path.join(ART, 'savedata.png')
-ICONTRAKT = os.path.join(ART, 'keeptrakt.png')
-ICONREAL = os.path.join(ART, 'keepdebrid.png')
-ICONLOGIN = os.path.join(ART, 'keeplogin.png')
-ICONCONTACT = os.path.join(ART, 'information.png')
-ICONSETTINGS = os.path.join(ART, 'settings.png')
+ICONBUILDS = 'http://'
+ICONMAINT = 'http://'
+ICONSPEED = 'http://'
+ICONAPK = 'http://'
+ICONADDONS = 'http://'
+ICONYOUTUBE = 'http://'
+ICONSAVE = 'http://'
+ICONTRAKT = 'http://'
+ICONREAL = 'http://'
+ICONLOGIN = 'http://'
+ICONCONTACT = 'http://'
+ICONSETTINGS = 'http://'
 # Hide the section separators 'Yes' or 'No'
 HIDESPACERS = 'No'
 # Character used in separator
