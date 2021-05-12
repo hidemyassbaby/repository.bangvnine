@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon	id="script.disclaimer" 
+		name="Disclaimer" 
+		version="2.5" 
+		provider-name="[COLOR dodgerblue][I]Barroni[/I][/COLOR]">
+  <requires>
+    <import addon="xbmc.python" version="2.1.0"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+        <provides>executable</provides>
+  </extension>
+  <extension point="xbmc.service" library="startup.py" start="startup" />
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en">[COLOR dodgerblue]Disclaimer[/COLOR]</summary>
+    <description lang="en">Provides a disclaimer for builds.</description>
+	<disclaimer lang="en"></disclaimer>
+    <platform>all</platform>
+	<assets>
+		<icon>resources/icon.png</icon>
+		<fanart>resources/fanart.jpg</fanart>
+		<screenshot>resources/screenshot1.png</screenshot>
+		<screenshot>resources/screenshot2.png</screenshot>
+		<screenshot>resources/screenshot3.png</screenshot>
+	</assets>
+  </extension>
+</addon>

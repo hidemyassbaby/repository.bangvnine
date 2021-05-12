@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+    <category label="Nothing To See Here :-)">
+		<setting id="accepted" type="text" label="Accepted terms and conditions:" visible="flase" default="false"/>
+   	</category>  	
+  </settings>

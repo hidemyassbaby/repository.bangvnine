@@ -1,0 +1,5 @@
+﻿[B]0.0.2[/B]
+• Added accept and decline button to dialod yesno
+
+﻿[B]0.0.1[/B]
+• Initial release
