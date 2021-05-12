@@ -72,15 +72,15 @@
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencenzbuildpc" name="Skin Backgrounds NZ Build PC" version="4.1" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzaus" name="Skin Backgrounds NZ AUS" version="4.5" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
 		<import addon="kodi.resource" version="1.0.0"/>
 	</requires>
 	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack NZ Build PC</summary>
-		<description lang="en">Skin Backgrounds Pack NZ Build PC</description>
+		<summary lang="en">Skin Backgrounds Pack NZ Ausralia build</summary>
+		<description lang="en">Skin Backgrounds Pack NZ Australia Build</description>
 		<platform>all</platform>
 	</extension>
 </addon>
