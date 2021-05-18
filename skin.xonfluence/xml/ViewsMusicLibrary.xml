@@ -585,6 +585,7 @@
                     <orientation>horizontal</orientation>
                     <include>VideoCodecFlaggingConditions</include>
                     <include>AudioCodecFlaggingConditions</include>
+                    <include>AudioChannelsFlaggingConditions</include>
                 </control>
                 <control type="label">
                     <left>15</left>
@@ -829,7 +830,7 @@
                         <top>45</top>
                         <width>525</width>
                         <height>38</height>
-                        <label fallback="416">$INFO[ListItem.Property(Artist_Genre)]</label>
+                        <label fallback="10005">$INFO[ListItem.Property(Artist_Genre)]</label>
                         <align>left</align>
                         <aligny>center</aligny>
                         <font>font13</font>

@@ -1884,7 +1884,7 @@ msgid "Enable artist slideshow"
 msgstr ""
 
 msgctxt "#31930"
-msgid "Configure addon.artistslideshow"
+msgid "Configure script.artistslideshow"
 msgstr ""
 
 msgctxt "#31931"
@@ -1892,7 +1892,7 @@ msgid "Enable global search"
 msgstr ""
 
 msgctxt "#31932"
-msgid "Configure addon.globalsearch"
+msgid "Configure script.globalsearch"
 msgstr ""
 
 msgctxt "#31933"
@@ -2161,4 +2161,52 @@ msgstr ""
 
 msgctxt "#31999"
 msgid "Resolution"
+msgstr ""
+
+msgctxt "#32000"
+msgid "Recent Movies (includes watched)"
+msgstr ""
+
+msgctxt "#32001"
+msgid "Recent Episodes (includes watched)"
+msgstr ""
+
+msgctxt "#32002"
+msgid "Recent Concerts (includes watched)"
+msgstr ""
+
+msgctxt "#32003"
+msgid "Show main menu in all caps"
+msgstr ""
+
+msgctxt "#32004"
+msgid "Enable favourites script"
+msgstr ""
+
+msgctxt "#32005"
+msgid "Enable video node stats script"
+msgstr ""
+
+msgctxt "#32006"
+msgid "Disable video hardware acceleration for .AVI and .WMV"
+msgstr ""
+
+msgctxt "#32007"
+msgid "Configure service.library.data.provider"
+msgstr ""
+
+msgctxt "#32008"
+msgid "Show larger seekbar when rewinding or forwarding"
+msgstr ""
+
+msgctxt "#32009"
+msgid "Show seekbar with intro"
+msgstr ""
+
+msgctxt "#32010"
+msgid "Hide shadow behind seekbar"
+msgstr ""
+
+msgctxt "#32011"
+msgid "Enable CPU temperature display"
 msgstr ""

@@ -230,7 +230,8 @@
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Icon,Icons/favorites.png)</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label)</onclick>
                 <include>CloseMenuChoice</include>
-                <visible>String.IsEqual(Window.Property(MenuItemType),MainMenu)</visible>
+                <visible>System.HasAddon(script.favourites)</visible>
+				<visible>String.IsEqual(Window.Property(MenuItemType),MainMenu)</visible>
             </item>
             <item>
                 <description>Add-Ons</description>
@@ -298,7 +299,8 @@
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Icon,Icons/library.png)</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label)</onclick>
                 <include>CloseMenuChoice</include>
-                <visible>!Skin.HasSetting(DisableGlobalSearch)</visible>
+                <visible>System.HasAddon(script.globalsearch)</visible>
+				<visible>!Skin.HasSetting(DisableGlobalSearch)</visible>
                 <visible>String.IsEqual(Window.Property(MenuItemType),MainMenu)</visible>
             </item>
             <item>
@@ -352,7 +354,7 @@
                 <visible>String.IsEqual(Window.Property(MenuItemType),MainMenu)</visible>
             </item>
             <item>
-                <description>XBMC Command</description>
+                <description>Kodi Command</description>
                 <label>$LOCALIZE[31243]</label>
                 <include>ClearButtonChoice</include>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label,$LOCALIZE[31243])</onclick>
@@ -630,6 +632,7 @@
                 <label>$LOCALIZE[3] - $LOCALIZE[559]</label>
                 <include>ClearButtonChoice</include>
                 <onclick>Skin.SetFile(UsrSelectAddon,.xsp,special://videoplaylists/)</onclick>
+				<onclick>ActivateWindow(2133)</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label,$LOCALIZE[559])</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,"$INFO[Skin.String(UsrSelectAddon)]",return))</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Playlist,$INFO[Skin.String(UsrSelectAddon)])</onclick>
@@ -1400,7 +1403,8 @@
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Icon,Icons/tvshows.png)</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label)</onclick>
                 <include>CloseMenuChoice</include>
-                <visible>String.IsEqual(Window.Property(MenuItemType),TVShowsMenu)</visible>
+                <visible>System.HasAddon(service.skin.widgets)</visible>
+				<visible>String.IsEqual(Window.Property(MenuItemType),TVShowsMenu)</visible>
             </item>
             <item>
                 <description>TVShows</description>
@@ -1423,7 +1427,7 @@
                 <description>In Progress TVShows</description>
                 <label>$LOCALIZE[575] $LOCALIZE[31424]</label>
                 <include>ClearButtonChoice</include>
-                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,library://video/inprogressshows.xml/,return))</onclick>
+                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,videodb://inprogresstvshows/,return))</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label,$LOCALIZE[575])</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Sub,TVShows)</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Addon,None)</onclick>
@@ -1440,7 +1444,7 @@
                 <description>Recently Added TVShows</description>
                 <label>$LOCALIZE[31253] $LOCALIZE[31424]</label>
                 <include>ClearButtonChoice</include>
-                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,RecentlyAddedEpisodes,return))</onclick>
+                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,videodb://recentlyaddedepisodes/,return))</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label,$LOCALIZE[31253])</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Sub,TVShows)</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Addon,None)</onclick>
@@ -1457,7 +1461,7 @@
                 <description>TVShows Genre</description>
                 <label>$LOCALIZE[31424] $LOCALIZE[135]</label>
                 <include>ClearButtonChoice</include>
-                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,TVShowGenres,return))</onclick>
+                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,videodb://tvshows/genres/,return))</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label,$LOCALIZE[135])</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Sub,TVShows)</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Addon,None)</onclick>
@@ -1474,7 +1478,7 @@
                 <description>TVShows Tags</description>
                 <label>$LOCALIZE[31424] $LOCALIZE[20459]</label>
                 <include>ClearButtonChoice</include>
-                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,TVShowTags, return))</onclick>
+                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,TVShowTags,return))</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label,$LOCALIZE[20459])</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Sub,TVShows)</onclick>
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Addon,None)</onclick>
@@ -1555,7 +1559,7 @@
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Icon,Icons/music2.png)</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label)</onclick>
                 <include>CloseMenuChoice</include>
-                <visible>String.IsEqual(Window.Property(MenuItemType),ConcertsMenu)</visible>
+				<visible>String.IsEqual(Window.Property(MenuItemType),ConcertsMenu)</visible>
             </item>
             <item>
                 <description>Concerts</description>
@@ -1606,6 +1610,23 @@
                 <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Icon,Icons/music2.png)</onclick>
                 <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label)</onclick>
                 <include>CloseMenuChoice</include>
+                <visible>String.IsEqual(Window.Property(MenuItemType),ConcertsMenu)</visible>
+            </item>
+			<item>
+                <description>Concerts Artists</description>
+                <label>$LOCALIZE[31425] $LOCALIZE[133]</label>
+                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Path,ActivateWindow(Videos,MusicVideoArtists,return))</onclick>
+                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label,$LOCALIZE[31425] $LOCALIZE[133])</onclick>
+                <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Sub,Concerts)</onclick>
+                <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Addon,None)</onclick>
+                <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Widget,RecentConcerts)</onclick>
+                <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Type,Concerts)</onclick>
+                <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Display,Default)</onclick>
+                <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Fanart,$VAR[SkinBackgroundPath]musicvideos.jpg)</onclick>
+                <onclick condition="Window.IsVisible(2114)">Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Icon,Icons/music2.png)</onclick>
+                <onclick>Skin.SetString($INFO[Window(Home).Property(UsrSelectBtn)].Label)</onclick>
+                <include>CloseMenuChoice</include>
+                <visible>Library.HasContent(MusicVideos)</visible>
                 <visible>String.IsEqual(Window.Property(MenuItemType),ConcertsMenu)</visible>
             </item>
             <item>

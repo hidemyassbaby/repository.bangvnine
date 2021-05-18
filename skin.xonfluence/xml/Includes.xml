@@ -24,6 +24,7 @@
     <include file="IncludesCodecFlagging.xml" />
     <include file="IncludesPVR.xml" />
     <include file="IncludesBackgroundBuilding.xml" />
+	<include file="IncludesNowPlaying.xml" />
     <!-- CONSTANTS -->
     <constant name="FanartCrossfadeTime">500</constant>
     <constant name="IconCrossfadeTime">400</constant>
@@ -753,7 +754,7 @@
         <pulseonselect>false</pulseonselect>
     </include>
     <include name="SideBladeLeft">
-        <animation effect="slide" start="0,0" end="375,0" time="300" tween="quadratic" easing="out" condition="[!String.IsEmpty(Window.Property(SideBladeOpen)) | ControlGroup(9000).HasFocus | ControlGroup(8999).HasFocus] + ![Window.IsActive(PVRGuideInfo) | Window.IsActive(PVRRadioRDSInfo)]">Conditional</animation>
+        <animation effect="slide" start="0,0" end="375,0" time="300" tween="quadratic" easing="out" condition="[[Window.IsActive(script-globalsearch.xml) + ControlGroup(9999).HasFocus] | !String.IsEmpty(Window.Property(SideBladeOpen)) | ControlGroup(9000).HasFocus | ControlGroup(8999).HasFocus] + ![Window.IsActive(PVRGuideInfo) | Window.IsActive(PVRRadioRDSInfo)]">Conditional</animation>
         <animation effect="slide" start="0,0" end="-450,0" time="300" tween="quadratic" easing="out" condition="!String.IsEmpty(Window.Property(SideBladeOpen)) | ControlGroup(9000).HasFocus">WindowClose</animation>
         <animation effect="slide" start="0,0" end="-75,0" time="225" tween="quadratic" easing="out" condition="String.IsEmpty(Window.Property(SideBladeOpen)) | !ControlGroup(9000).HasFocus">WindowClose</animation>
         <animation effect="slide" start="-75,0" end="0,0" time="225" tween="quadratic" easing="out">WindowOpen</animation>
@@ -1695,12 +1696,34 @@
             <animation effect="slide" start="0,0" end="-60,0" time="75" condition="Player.Muted">conditional</animation>
             <animation effect="slide" start="0,0" end="-120,0" time="0" condition="![Window.IsVisible(AddonSettings) | Window.IsVisible(SelectDialog) | Window.IsVisible(VisualisationPresetList) | Window.IsVisible(PVROSDChannels) | Window.IsVisible(PVROSDGuide) | Window.IsVisible(1105)]+system.getbool(input.enablemouse)+Window.IsVisible(MusicOSD)">conditional</animation>
             <animation effect="slide" start="0,0" end="-120,0" time="0" condition="![Window.IsVisible(PVROSDGuide) | Window.IsVisible(PVROSDChannels) | Window.IsVisible(SliderDialog) | Window.IsVisible(OSDVideoSettings) | Window.IsVisible(OSDAudioSettings) | Window.IsVisible(VideoBookmarks)]+system.getbool(input.enablemouse)+Window.IsVisible(VideoOSD)">conditional</animation>
-            <animation effect="slide" start="0,0" end="-120,0" time="0" condition="system.getbool(input.enablemouse)+Window.IsVisible(1198)">conditional</animation>
+            <animation effect="slide" start="0,0" end="-120,0" time="0" condition="system.getbool(input.enablemouse) + Window.IsVisible(1198)">conditional</animation>
             <animation effect="slide" start="0,0" end="0,-82" time="150" condition="Window.IsVisible(busydialog)">conditional</animation>
             <include condition="!String.IsEmpty(Skin.String(HomeTrans))">HomeTransparentEffect</include>
-            <visible>!Skin.HasSetting(HideSystemTime)</visible>
+            <visible>!Skin.HasSetting(HideSystemTime) + Skin.HasSetting(HideCPUTemp)</visible>
+        </control>
+		<control type="label" id="1">
+            <description>Date label</description>
+            <right>30</right>
+            <top>52</top>
+            <width>450</width>
+            <height>22</height>
+            <align>right</align>
+            <aligny>center</aligny>
+            <font>font10</font>
+            <textcolor>white</textcolor>
+            <shadowcolor>black</shadowcolor>
+            <label>$INFO[System.Date] • [COLOR=yellow]$INFO[System.CPUTemperature][/COLOR]</label>
+            <include>Window_OpenClose_Animation</include>
+            <animation effect="slide" start="0,0" end="-60,0" time="75" condition="Player.Muted">conditional</animation>
+            <animation effect="slide" start="0,0" end="-120,0" time="0" condition="![Window.IsVisible(AddonSettings) | Window.IsVisible(SelectDialog) | Window.IsVisible(VisualisationPresetList) | Window.IsVisible(PVROSDChannels) | Window.IsVisible(PVROSDGuide) | Window.IsVisible(1105)]+system.getbool(input.enablemouse)+Window.IsVisible(MusicOSD)">conditional</animation>
+            <animation effect="slide" start="0,0" end="-120,0" time="0" condition="![Window.IsVisible(PVROSDGuide) | Window.IsVisible(PVROSDChannels) | Window.IsVisible(SliderDialog) | Window.IsVisible(OSDVideoSettings) | Window.IsVisible(OSDAudioSettings) | Window.IsVisible(VideoBookmarks)]+system.getbool(input.enablemouse)+Window.IsVisible(VideoOSD)">conditional</animation>
+            <animation effect="slide" start="0,0" end="-120,0" time="0" condition="system.getbool(input.enablemouse) + Window.IsVisible(1198)">conditional</animation>
+            <animation effect="slide" start="0,0" end="0,-82" time="150" condition="Window.IsVisible(busydialog)">conditional</animation>
+            <include condition="!String.IsEmpty(Skin.String(HomeTrans))">HomeTransparentEffect</include>
+            <visible>!Skin.HasSetting(HideSystemTime) + !Skin.HasSetting(HideCPUTemp)</visible>
         </control>
     </include>
+	
     <include name="CDArtSpinner">
         <animation effect="slide" start="0,0" end="105,0" time="1200" delay="500" condition="Player.Playing | Player.Forwarding | Player.Rewinding">Conditional</animation>
         <animation effect="rotate" end="-360" center="auto" time="2400" loop="true" reversible="false" condition="Player.Playing">Conditional</animation>
@@ -2417,14 +2440,17 @@
             <top>0</top>
             <visible>!String.IsEmpty(Weather.Plugin) + String.IsEqual(Skin.String(TopLeftHomeInfo),Weather)</visible>
             <include>Window_OpenClose_Animation</include>
-            <control type="image" id="1">
+     		<control type="multiimage" id="1">
                 <description>Weather image</description>
                 <left>0</left>
                 <top>0</top>
                 <width>90</width>
                 <height>90</height>
-                <aspectratio>keep</aspectratio>
-                <texture>$VAR[WeatherIconPath]$INFO[Window(Weather).Property(Current.OutlookIcon)]</texture>
+				<aspectratio aligny="center">keep</aspectratio>
+                <timeperimage>70</timeperimage>
+                <fadetime>1</fadetime>
+                <randomize>false</randomize>
+                <imagepath>$VAR[WeatherIconPath]$INFO[Window(Weather).Property(Current.FanartCode)]$VAR[WeatherIconExt]</imagepath>
             </control>
             <control type="label" id="1">
                 <description>Location label</description>
@@ -2949,8 +2975,8 @@
         <include condition="[Skin.HasSetting(DisableGlobalSearch) | !Skin.HasSetting(FloorGlobalSearch)] + Skin.HasSetting(HideHomePowerBtn) + Skin.HasSetting(HideFavorites)">Button0</include>
     </include>
     <include name="UnloadsScripts">
-        <onunload condition="Skin.HasSetting(ScriptDisableTVNextAired) | [!Skin.HasSetting(ScriptDisableTVNextAired) + !System.HasAddon(script.tv.show.next.aired)]">Skin.Setbool(DisableTVNextAired)</onunload>
-        <onunload condition="!Skin.HasSetting(ScriptDisableTVNextAired) + System.HasAddon(script.tv.show.next.aired)">Skin.Reset(DisableTVNextAired)</onunload>
+        <onunload condition="Skin.HasSetting(ScriptDisableTVNextAired) | [!Skin.HasSetting(ScriptDisableTVNextAired) + !System.HasAddon(script.tv.show.next.aired) + !System.HasAddon(script.embuary.info)]">Skin.Setbool(DisableTVNextAired)</onunload>
+        <onunload condition="!Skin.HasSetting(ScriptDisableTVNextAired) + [System.HasAddon(script.tv.show.next.aired) | System.HasAddon(script.embuary.info)]">Skin.Reset(DisableTVNextAired)</onunload>
         <onunload condition="Skin.HasSetting(ScriptDisableScriptPlaylist) | [!Skin.HasSetting(ScriptDisableScriptPlaylist) + !System.HasAddon(script.randomandlastitems)]">Skin.Setbool(DisableScriptPlaylist)</onunload>
         <onunload condition="!Skin.HasSetting(ScriptDisableScriptPlaylist) + System.HasAddon(script.randomandlastitems)">Skin.Reset(DisableScriptPlaylist)</onunload>
         <onunload condition="!Skin.HasSetting(ScriptEnableFanartScript) | [Skin.HasSetting(ScriptEnableFanartScript) + !System.HasAddon(script.grab.fanart)]">Skin.Reset(EnableFanartScript)</onunload>

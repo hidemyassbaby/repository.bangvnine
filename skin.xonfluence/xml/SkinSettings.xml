@@ -314,6 +314,18 @@
                                 <selected>Skin.HasSetting(ClockShowSeconds)</selected>
                                 <enable>!Skin.HasSetting(HideSystemTime)</enable>
                             </control>
+							<control type="radiobutton" id="1021">
+                                <description>CPU Temp</description>
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <label>$LOCALIZE[32011]</label>
+                                <include>MenuButton</include>
+                                <onclick>Skin.ToggleSetting(HideCPUTemp)</onclick>
+                                <selected>!Skin.HasSetting(HideCPUTemp)</selected>
+                            </control>
                             <control type="button" id="104">
                                 <description>Main Colour One</description>
                                 <width>1125</width>
@@ -444,8 +456,22 @@
                                 <focusedcolor>white</focusedcolor>
                                 <label>$LOCALIZE[31066]</label>
                                 <include>MenuButton</include>
-                                <onclick>Skin.ToggleSetting(HidePopUpSeekBar)</onclick>
+                                <onclick condition="Skin.HasSetting(HidePopupSeekBar) + Skin.HasSetting(StandardSeekBar)">Skin.Reset(StandardSeekBar)</onclick>
+								<onclick>Skin.ToggleSetting(HidePopUpSeekBar)</onclick>
                                 <selected>!Skin.HasSetting(HidePopUpSeekBar)</selected>
+                            </control>
+							<control type="radiobutton" id="11401">
+                                <description>Standard Seekbar</description>
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <label>$LOCALIZE[32008]</label>
+                                <include>MenuButton</include>
+                                <onclick condition="!Skin.HasSetting(StandardSeekBar) + !Skin.HasSetting(HidePopupSeekBar)">Skin.SetBool(HidePopupSeekBar)</onclick>
+								<onclick>Skin.ToggleSetting(StandardSeekBar)</onclick>
+                                <selected>Skin.HasSetting(StandardSeekBar)</selected>
                             </control>
                             <control type="radiobutton" id="115">
                                 <description>Minimum Popup Seekbar Window</description>
@@ -681,6 +707,19 @@
                                 <onclick condition="Skin.String(MenuLAF,GraphFocused)">Skin.SetString(MenuLAF,GraphText)</onclick>
                                 <onclick condition="Skin.String(MenuLAF,GraphText)">Skin.Reset(MenuLAF)</onclick>
                             </control>
+							<control type="radiobutton" id="135">
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <label>$LOCALIZE[32006]</label>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <include>MenuButton</include>
+                                <onclick>Skin.ToggleSetting(AutoDisableHWAccel)</onclick>
+                                <selected>Skin.HasSetting(AutoDisableHWAccel)</selected>
+								<visible>System.Platform.Android</visible>
+								<visible>System.HasAddon(script.embuary.helper)</visible>
+                            </control>
                         </control>
                         <control type="scrollbar" id="2061">
                             <left>1155</left>
@@ -798,6 +837,18 @@
                                 <label>$LOCALIZE[31275]</label>
                                 <onclick>Skin.ToggleSetting(AutoVisableSubMenu)</onclick>
                                 <selected>!Skin.HasSetting(AutoVisableSubMenu)</selected>
+                                <include>MenuButton</include>
+                            </control>
+							<control type="radiobutton" id="14001">
+                                <description>Main menu in all caps</description>
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <label>$LOCALIZE[32003]</label>
+                                <onclick>Skin.ToggleSetting(MainMenuAllCaps)</onclick>
+                                <selected>Skin.HasSetting(MainMenuAllCaps)</selected>
                                 <include>MenuButton</include>
                             </control>
                             <control type="radiobutton" id="141">
@@ -1303,6 +1354,18 @@
                                 <onclick>Skin.ToggleSetting(HideInfoStartOSD)</onclick>
                                 <selected>!Skin.HasSetting(HideInfoStartOSD)</selected>
                             </control>
+							<control type="radiobutton" id="17801">
+                                <description>OSD Seekbar wiht Start Media Intro</description>
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <label>  - $LOCALIZE[32009]</label>
+                                <include>MenuButton</include>
+                                <onclick>Skin.ToggleSetting(ShowSeekBarIntro)</onclick>
+                                <selected>Skin.HasSetting(ShowSeekBarIntro)</selected>
+                            </control>
                             <control type="radiobutton" id="179">
                                 <description>OSD Plot on Media Pause</description>
                                 <width>1125</width>
@@ -1336,8 +1399,21 @@
                                 <focusedcolor>white</focusedcolor>
                                 <label>$LOCALIZE[31374]</label>
                                 <include>MenuButton</include>
-                                <onclick>Skin.ToggleSetting(HideSeekBarPaused)</onclick>
-                                <selected>!Skin.HasSetting(HideSeekBarPaused)</selected>
+                                <onclick>Skin.ToggleSetting(ShowSeekBarPaused)</onclick>
+                                <selected>Skin.HasSetting(ShowSeekBarPaused)</selected>
+                            </control>
+							<control type="radiobutton" id="1811">
+                                <description>Hide shadow behind seekbar</description>
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <label> - $LOCALIZE[32010]</label>
+                                <include>MenuButton</include>
+                                <onclick>Skin.ToggleSetting(HideShadowSeekBar)</onclick>
+                                <selected>Skin.HasSetting(HideShadowSeekBar)</selected>
+								<visible>Skin.HasSetting(ShowSeekBarPaused)</visible>
                             </control>
                             <control type="radiobutton" id="182">
                                 <description>Video Info OSD</description>
@@ -10250,6 +10326,42 @@
                                 <enable>!String.IsEmpty(Skin.String(LyricScript_Path))</enable>
                                 <onclick>Addon.OpenSettings($INFO[Skin.String(LyricScript_Path)])</onclick>
                             </control>
+							<control type="radiobutton" id="652">
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <label>$LOCALIZE[32004]</label>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <include>MenuButton</include>
+								<onclick condition="!System.HasAddon(script.favourites) + !Skin.HasSetting(EnableScriptFavourites)">InstallAddon(script.favourites)</onclick>
+                                <onclick>Skin.ToggleSetting(EnableScriptFavourites)</onclick>
+                                <selected>Skin.HasSetting(EnableScriptFavourites)</selected>
+                            </control>
+							<control type="radiobutton" id="653">
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <label>$LOCALIZE[32005]</label>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <include>MenuButton</include>
+                                <onclick condition="!System.HasAddon(service.library.data.provider) + !Skin.HasSetting(EnableScriptStats)">InstallAddon(service.library.data.provider)</onclick>
+								<onclick>Skin.ToggleSetting(EnableScriptStats)</onclick>
+                                <selected>Skin.HasSetting(EnableScriptStats)</selected>
+                            </control>
+							<control type="button" id="654">
+                                <width>1125</width>
+                                <height>60</height>
+                                <font>font13</font>
+                                <label> - $LOCALIZE[32007]</label>
+                                <textcolor>grey2</textcolor>
+                                <focusedcolor>white</focusedcolor>
+                                <include>MenuButton</include>
+                                <onclick>Addon.OpenSettings(service.library.data.provider)</onclick>
+                                <enable>Skin.HasSetting(EnableScriptStats)</enable>
+                                <visible>System.HasAddon(service.library.data.provider)</visible>
+                            </control>
                             <control type="radiobutton" id="637">
                                 <width>1125</width>
                                 <height>60</height>
@@ -10344,7 +10456,7 @@
                                 <include>MenuButton</include>
                                 <onclick>Skin.ToggleSetting(ScriptDisableTVNextAired)</onclick>
                                 <selected>!Skin.HasSetting(ScriptDisableTVNextAired)</selected>
-                                <enable>System.HasAddon(script.tv.show.next.aired)</enable>
+                                <enable>[System.HasAddon(script.tv.show.next.aired) | System.HasAddon(script.embuary.info)]</enable>
                             </control>
                             <control type="button" id="645">
                                 <width>1125</width>
