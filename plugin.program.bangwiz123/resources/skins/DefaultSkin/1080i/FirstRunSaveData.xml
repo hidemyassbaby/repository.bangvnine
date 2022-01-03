@@ -66,11 +66,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Trakt</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="302">
@@ -82,11 +82,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Real Debrid</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="303">
@@ -98,11 +98,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Login Data</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="314">
@@ -114,11 +114,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Alluc Login</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="305">
@@ -130,11 +130,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Profiles.xml</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="306">
@@ -146,11 +146,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My AdvancedSettings.xml</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="307">
@@ -162,11 +162,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Favourites.xml</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="308">
@@ -178,11 +178,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Super Favourites</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="309">
@@ -194,11 +194,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Repositories</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="310">
@@ -210,11 +210,11 @@
                 <radioposx>530</radioposx>
                 <label>Keep My Whitelist</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
             <control type="radiobutton" id="311">
@@ -226,11 +226,11 @@
                 <radioposx>530</radioposx>
                 <label>Clear Cache on Startup</label>
                 <font>font12</font>
-                <texturefocus colordiffuse="FF12B2E7">RadioButton/MenuItemFO.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">RadioButton/MenuItemFO.png</texturefocus>
                 <texturenofocus>RadioButton/MenuItemNF.png</texturenofocus>
-                <textureradioonfocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonfocus>
-                <textureradioonnofocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioonnofocus>
-                <textureradioofffocus colordiffuse="FF12B2E7">RadioButton/radiobutton-focus.png</textureradioofffocus>
+                <textureradioonfocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonfocus>
+                <textureradioonnofocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioonnofocus>
+                <textureradioofffocus colordiffuse="FF01DF01">RadioButton/radiobutton-focus.png</textureradioofffocus>
                 <textureradiooffnofocus>RadioButton/radiobutton-nofocus.png</textureradiooffnofocus>
             </control>
         </control>
@@ -247,7 +247,7 @@
                 <aligny>center</aligny>
                 <onup>9000</onup>
                 <ondown>9000</ondown>
-                <texturefocus border="40" colordiffuse="FF12B2E7">Button/loguploader-dialogbutton-fo.png</texturefocus>
+                <texturefocus border="40" colordiffuse="FF01DF01">Button/loguploader-dialogbutton-fo.png</texturefocus>
                 <texturenofocus border="40">Button/loguploader-dialogbutton-nofo.png</texturenofocus>
             </control>
         </control>

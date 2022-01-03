@@ -1,5 +1,0 @@
-v3.6
-
-- Wizard Change to GUI Setup 
-- Code Updated To Latest Standard
-- Backgrounds Updated

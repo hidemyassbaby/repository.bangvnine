@@ -1504,20 +1504,17 @@ def fileCount(home, excludes=True):
 			item.append(file)
 	return len(item)
 	
-
-
-
 def defaultSkin():
-
 	log("[Default Skin Check]", xbmc.LOGINFO)
 	tempgui = os.path.join(USERDATA, 'guitemp.xml')
 	gui = tempgui if os.path.exists(tempgui) else GUISETTINGS
 	if not os.path.exists(gui): return False
 	log("Reading gui file: %s" % gui, xbmc.LOGINFO)
-	guif = open(gui, 'r+', encoding='utf-8')
+	guif = open(GUISETTINGS, 'r', encoding='utf-8')
 	msg = guif.read().replace('\n','').replace('\r','').replace('\t','').replace('    ',''); guif.close()
+	log('msg= ' + str(msg), xbmc.LOGINFO)
 	log("Opening gui settings", xbmc.LOGINFO)
-	match = re.compile('<lookandfeel>.+?<ski.+?>(.+?)</skin>.+?</lookandfeel>').findall(msg)
+	match = re.compile('<setting id="lookandfeel.skin".+?(skin.+?)</setting>').findall(msg)
 	log("Matches: %s" % str(match), xbmc.LOGINFO)
 	if len(match) > 0:
 		skinid = match[0]
@@ -1526,16 +1523,17 @@ def defaultSkin():
 			addf = open(addonxml, 'r+', encoding='utf-8')
 			msg2 = addf.read(); addf.close()
 			match2 = parseDOM(msg2, 'addon', ret='name')
+			xbmc.log('match2= ' + str(match2), xbmc.LOGINFO)
 			if len(match2) > 0: skinname = match2[0]
 			else: skinname = 'no match'
+		elif skinid.endswith('estuary'): skinname = 'Estuary'
+		elif skinid.endswith('estouchy'): skinname = 'Estouchy'
 		else: skinname = 'no file'
 		log("[Default Skin Check] Skin name: %s" % skinname, xbmc.LOGINFO)
 		log("[Default Skin Check] Skin id: %s" % skinid, xbmc.LOGINFO)
 		setS('defaultskin', skinid)
 		setS('defaultskinname', skinname)
 		setS('defaultskinignore', 'false')
-		
-
 	if os.path.exists(tempgui):
 		log("Deleting Temp Gui File.", xbmc.LOGINFO)
 		os.remove(tempgui)
@@ -1797,7 +1795,7 @@ def backUpOptions(type, name=""):
 				match = glob.glob(os.path.join(ADDOND,'skin.*', ''))
 				for fold in match:
 					fd = os.path.split(fold[:-1])[1]
-					if not fd in ['skin.confluence', 'skin.re-touch', 'skin.estuary', 'skin.estouchy']:
+					if not fd in ['skin.estuary', 'skin.estouchy']:
 						for base, dirs, files in os.walk(os.path.join(ADDOND,fold)):
 							files[:] = [f for f in files if f not in exclude_files]
 							for file in files:
@@ -1868,7 +1866,7 @@ def backUpOptions(type, name=""):
 				match = glob.glob(os.path.join(ADDOND,'skin.*', ''))
 				for fold in match:
 					fd = os.path.split(fold[:-1])[1]
-					if not fd in ['skin.confluence', 'skin.re-touch', 'skin.estuary', 'skin.estouchy']:
+					if not fd in ['skin.re-touch', 'skin.estuary', 'skin.estouchy']:
 						if DIALOG.yesno(ADDONTITLE, "[COLOR %s]Would you like to add the following skin folder to the GuiFix Zip File?[/COLOR]" % COLOR2 + "\n[COLOR %s]%s[/COLOR]" % (COLOR1, fd), yeslabel="[B][COLOR green]Add Skin[/COLOR][/B]", nolabel="[B][COLOR red]Skip Skin[/COLOR][/B]"):
 							for base, dirs, files in os.walk(os.path.join(ADDOND,fold)):
 								files[:] = [f for f in files if f not in exclude_files]
@@ -1922,7 +1920,7 @@ def backUpOptions(type, name=""):
 		convertSpecial(USERDATA, True)
 		asciiCheck(USERDATA, True)
 		try:
-			if not SKIN == 'skin.confluence':
+			if not SKIN == 'skin.estuary':
 				skinfold = os.path.join(ADDONS, SKIN, 'media')
 				match2 = glob.glob(os.path.join(skinfold,'*.xbt'))
 				if len(match2) > 1:
@@ -2769,18 +2767,19 @@ def reloadFix(default=None):
 	ebi("ReloadSkin()")
 
 def skinToDefault(title):
-	if not currSkin() in ['skin.confluence', 'skin.estuary']:
-		skin = 'skin.confluence' if KODIV < 17 else 'skin.estuary'
-	return swapSkins(skin, title)
+	if not currSkin() in ['skin.estuary']:
+		skin = 'skin.estuary'
+		return swapSkins(skin, title)
 
 def swapSkins(goto, title="Error"):
-	skinSwitch.swapSkins(goto)
+	swapSkins(goto)
 	x = 0
 	xbmc.sleep(1000)
 	while not xbmc.getCondVisibility("Window.isVisible(yesnodialog)") and x < 150:
 		x += 1
 		xbmc.sleep(100)
 		#ebi('SendAction(Select)')
+	xbmc.log('swapskins= ' + str(goto), xbmc.LOGINFO)
 	
 	if xbmc.getCondVisibility("Window.isVisible(yesnodialog)"):
 		ebi('SendClick(11)')

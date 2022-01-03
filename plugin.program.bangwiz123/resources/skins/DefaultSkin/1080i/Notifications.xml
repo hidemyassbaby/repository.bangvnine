@@ -58,7 +58,7 @@
                 <visible>true</visible>
                 <texturesliderbackground>Button/scrollbar-V-background.png</texturesliderbackground>
                 <texturesliderbar>Button/scrollbar-V.png</texturesliderbar>
-                <texturesliderbarfocus colordiffuse="FF12B2E7">Button/scrollbar-V-focus.png</texturesliderbarfocus>
+                <texturesliderbarfocus colordiffuse="FF01DF01">Button/scrollbar-V-focus.png</texturesliderbarfocus>
                 <orientation>vertical</orientation>
                 <showonepage>true</showonepage>
                 <onup>201</onup>
@@ -78,7 +78,7 @@
                 <label>Dismiss</label>
                 <align>center</align>
                 <aligny>center</aligny>
-                <texturefocus colordiffuse="FF12B2E7">Button/testbuttonfo.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">Button/testbuttonfo.png</texturefocus>
                 <texturenofocus>Button/testbuttonnf.png</texturenofocus>
                 <onleft>202</onleft>
                 <onright>202</onright>
@@ -96,7 +96,7 @@
                 <label>Remind Me Later</label>
                 <align>center</align>
                 <aligny>center</aligny>
-                <texturefocus colordiffuse="FF12B2E7">Button/testbuttonfo.png</texturefocus>
+                <texturefocus colordiffuse="FF01DF01">Button/testbuttonfo.png</texturefocus>
                 <texturenofocus>Button/testbuttonnf.png</texturenofocus>
                 <onleft>201</onleft>
                 <onright>201</onright>

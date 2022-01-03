@@ -207,8 +207,7 @@ class Skin(BaseSkin):
             self._estuary = True
         else:
             self._estuary = False
-        self._texture_dir = os.path.join(Addon('script.module.pyxbmct').getAddonInfo('path'),
-                                         'lib', 'pyxbmct', 'textures')
+        self._texture_dir = os.path.join(Addon().getAddonInfo('path'), 'pyxbmct', 'textures')
 
     @property
     def estuary(self):

@@ -1,5 +1,4 @@
-import os, xbmc, xbmcaddon
-import binascii
+import os, xbmcaddon
 #########################################################
 ### User Edit Variables #################################
 #########################################################
@@ -14,7 +13,7 @@ EXCLUDES       = [ADDON_ID, 'roms', 'My_Builds', 'backupdir', 'script.module.kod
 BUILDFILE      = 'https://raw.githubusercontent.com/hidemyassbaby/wizland/master/wizmenu.txt'
 UPDATECHECK    = 0
 APKFILE        = 'http://'
-YOUTUBETITLE   = 'Bang' 
+YOUTUBETITLE   = 'FTG Help Videos' 
 YOUTUBEFILE    = 'http://'
 ADDONFILE      = 'http://'
 ADVANCEDFILE   = 'http://'
@@ -35,10 +34,11 @@ ART            = os.path.join(PATH, 'resources', 'art')
 # Only these colors avalable
 # white , blue , orange , yellow , red , purple , pink , lime , cyan, green
 #Button focus color
-FOCUS_BUTTON_COLOR = 'purple'
-EXIT_BUTTON_COLOR = 'red'
+FOCUS_BUTTON_COLOR = 'white'
+EXIT_BUTTON_COLOR = 'white'
 #Highlight outline for lists
 HIGHLIGHT_LIST = 'button_focus'
+HIGHLIGHT_LIST2 = 'MenuItemFO'
 ##No TXT file Banner
 NO_TXT_FILE = 'pink'
 
@@ -47,45 +47,45 @@ NO_TXT_FILE = 'pink'
 ### The full list of colors for below can found @ https://forum.kodi.tv/showthread.php?tid=210837
 
 #Top Main buttons
-MAIN_BUTTONS_TEXT = 'ghostwhite'
+MAIN_BUTTONS_TEXT = 'white'
 #All other buttons
-OTHER_BUTTONS_TEXT = 'ghostwhite'
+OTHER_BUTTONS_TEXT = 'white'
 #all list text color
 ##FYI any color placed in the txt file will overide this
-LIST_TEXT = 'yellow'
+LIST_TEXT = 'khaki'
 
 
 #Description text title color
-DES_T_COLOR = 'ghostwhite'
+DES_T_COLOR = 'white'
 #Description color
-DESCOLOR = 'yellow'
+DESCOLOR = 'white'
 
 #Wizard title name and verion color
 WIZTITLE = 'Bang Wizard'
-WIZTITLE_COLOR = 'ghostwhite'
-VERTITLE_COLOR = 'ghostwhite'
-VER_NUMBER_COLOR = 'yellow'
+WIZTITLE_COLOR = 'black'
+VERTITLE_COLOR = 'black'
+VER_NUMBER_COLOR = 'black'
 ############################################################
 
 ## The colors and theme below is still used for the pop up dialogs
 ##Alway test to see the color combo
 # You can edit these however you want, just make sure that you have a %s in each of the
 # THEME's so it grabs the text from the menu item
-COLOR1         = 'blue'
-COLOR2         = 'yellow'
+COLOR1         = 'white'
+COLOR2         = 'lime'
 COLOR3         = 'red'
 COLOR4         = 'snow'
 COLOR5         = 'lime'
 # Primary menu items   / %s is the menu item and is required
-THEME1         = '[COLOR '+COLOR4+']%s[/COLOR]'
+THEME1         = '[COLOR '+COLOR1+']%s[/COLOR]'
 # Build Names          / %s is the menu item and is required
-THEME2         = '[COLOR '+COLOR4+']%s[/COLOR]'
+THEME2         = '[COLOR '+COLOR1+']%s[/COLOR]'
 # Alternate items      / %s is the menu item and is required
-THEME3         = '[COLOR '+COLOR3+']%s[/COLOR]'
+THEME3         = '[COLOR '+COLOR2+']%s[/COLOR]'
 # Current Build Header / %s is the menu item and is required
-THEME4         = '[COLOR '+COLOR3+']Current Build:[/COLOR] [COLOR '+COLOR3+']%s[/COLOR]'
+THEME4         = '[COLOR '+COLOR2+']Current Build:[/COLOR] [COLOR '+COLOR2+']%s[/COLOR]'
 # Current Theme Header / %s is the menu item and is required
-THEME5         = '[COLOR '+COLOR3+']Current Theme:[/COLOR] [COLOR '+COLOR3+']%s[/COLOR]'
+THEME5         = '[COLOR '+COLOR2+']Current Theme:[/COLOR] [COLOR '+COLOR2+']%s[/COLOR]'
 THEME6         = '[COLOR '+COLOR3+'][B]%s[/B][/COLOR]'
 
 
@@ -97,17 +97,17 @@ THEME6         = '[COLOR '+COLOR3+'][B]%s[/B][/COLOR]'
 # Example:  ICONMAINT     = os.path.join(ART, 'mainticon.png')
 #           ICONSETTINGS  = 'http://aftermathwizard.net/repo/wizard/settings.png'
 # Leave as http:// for default icon
-ICONBUILDS     = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONMAINT      = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONAPK        = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONADDONS     = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONYOUTUBE    = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONSAVE       = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONTRAKT      = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONREAL       = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONLOGIN      = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONCONTACT    = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
-ICONSETTINGS   = 'https://i.postimg.cc/RVB6gJkQ/icon.png'
+ICONBUILDS     = 'http://'
+ICONMAINT      = 'http://'
+ICONAPK        = 'http://'
+ICONADDONS     = 'http://'
+ICONYOUTUBE    = 'http://'
+ICONSAVE       = 'http://'
+ICONTRAKT      = 'http://'
+ICONREAL       = 'http://'
+ICONLOGIN      = 'http://'
+ICONCONTACT    = 'http://'
+ICONSETTINGS   = 'http://'
 # Hide the ====== seperators 'Yes' or 'No'
 HIDESPACERS    = 'No'
 # Character used in seperator
@@ -136,20 +136,20 @@ WIZARDFILE     = 'http://'
 ### AUTO INSTALL ########################################
 ########## REPO IF NOT INSTALLED ########################
 # Enable Auto Install 'Yes' or 'No'
-AUTOINSTALL    = 'No'
+AUTOINSTALL    = 'YES'
 # Addon ID for the repository
-REPOID         = ''
+REPOID         = 'repository.bangvnine'
 # Url to Addons.xml file in your repo folder(this is so we can get the latest version)
-REPOADDONXML   = 'http://'
+REPOADDONXML   = 'https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/main/repository.bangvnine/addon.xml'
 # Url to folder zip is located in
-REPOZIPURL     =  'http://'
+REPOZIPURL     =  'https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/main/repository.bangvnine/zips'
 #########################################################
 
 #########################################################
 ### NOTIFICATION WINDOW##################################
 #########################################################
 # Enable Notification screen Yes or No
-ENABLE         = 'No'
+ENABLE         = 'Yes'
 # Url to notification file
 NOTIFICATION   = 'http://'
 # Use either 'Text' or 'Image'
@@ -162,7 +162,7 @@ HEADERIMAGE    = ''
 # Font for Notification Window
 FONTSETTINGS   = 'Font12'
 # Background for Notification Window
-BACKGROUND     = 'http://'
+BACKGROUND     = os.path.join(ART, 'ContentPanel.png')
 BACKGROUND2     = os.path.join(ART, 'ContentPanel.png')
 BACKGROUND3     = os.path.join(ART, 'ContentPanel.png')
 ############################    #############################

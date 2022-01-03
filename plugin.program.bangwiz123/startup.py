@@ -194,7 +194,7 @@ def checkSkin():
 						gotoname = skinname[choice]
 				else: wiz.log("Skin was not reset", xbmc.LOGINFO); wiz.setS('defaultskinignore', 'true')
 			else:
-				if DIALOG.yesno(ADDONTITLE, "[COLOR %s]It seems that the skin has been set back to [COLOR %s]%s[/COLOR]" % (COLOR2, COLOR1, SKIN[5:].title()), "Would you like to set the skin back to:[/COLOR]" + '\n[COLOR %s]%s[/COLOR]' % (COLOR1, skinname[0])):
+				if DIALOG.yesno(ADDONTITLE, "[COLOR %s]It seems that the skin has been set back to [COLOR %s]%s[/COLOR]" % (COLOR2, COLOR1, SKIN[5:].title()) + "\nWould you like to set the skin back to:[/COLOR]" + '\n[COLOR %s]%s[/COLOR]' % (COLOR1, skinname[0])):
 					gotoskin = skinlist[0]
 					gotoname = skinname[0]
 				else: wiz.log("Skin was not reset", xbmc.LOGINFO); wiz.setS('defaultskinignore', 'true')
@@ -325,7 +325,7 @@ wiz.log("[Installed Check] Started", xbmc.LOGINFO)
 if INSTALLED == 'true':
 	if KODIV >= 17:
 		wiz.kodi17Fix()
-		if SKIN in ['skin.confluence', 'skin.estuary']:
+		if SKIN in ['skin.estuary']:
 			checkSkin()
 		FAILED = True
 	elif not EXTRACT == '100' and not BUILDNAME == "":
@@ -337,7 +337,7 @@ if INSTALLED == 'true':
 			wiz.ebi("PlayMedia(plugin://%s/?mode=install&name=%s&url=fresh)" % (ADDON_ID, urllib.parse.quote_plus(BUILDNAME)))
 			wiz.log("[Installed Check] Fresh Install Re-activated", xbmc.LOGINFO)
 		else: wiz.log("[Installed Check] Reinstall Ignored")
-	elif SKIN in ['skin.confluence', 'skin.estuary']:
+	elif SKIN in ['skin.estuary']:
 		wiz.log("[Installed Check] Incorrect skin: %s" % SKIN, xbmc.LOGINFO)
 		defaults = wiz.getS('defaultskin')
 		if not defaults == '':
@@ -390,7 +390,7 @@ if FAILED == False:
 		wiz.setS('lastbuildcheck', str(NEXTCHECK))
 	elif not BUILDNAME == '':
 		wiz.log("[Build Check] Build Installed", xbmc.LOGINFO)
-		if SKIN in ['skin.confluence', 'skin.estuary'] and not DEFAULTIGNORE == 'true':
+		if SKIN in ['skin.estuary'] and not DEFAULTIGNORE == 'true':
 			checkSkin()
 			wiz.log("[Build Check] Build Installed: Checking Updates", xbmc.LOGINFO)
 			wiz.setS('lastbuildcheck', str(NEXTCHECK))

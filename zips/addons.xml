@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
-<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="3.6" provider-name="Bang">
+<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="3.4" provider-name="Bang">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
     <import addon="script.module.six" />
@@ -16,12 +16,12 @@
     <description lang="en">Bang Wizard - All Builds in one place</description>
     <platform>all</platform>
     <assets>
-				<icon>icon.png</icon>
-				<fanart>fanart.jpg</fanart>
-				<banner></banner>
-				<clearlogo></clearlogo>
-				<screenshot></screenshot>
-		</assets>
+        <icon>icon.png</icon>
+        <fanart>fanart.jpg</fanart>
+        <banner></banner>
+        <clearlogo></clearlogo>
+        <screenshot></screenshot>
+    </assets>
   </extension>
 </addon>
 
