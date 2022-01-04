@@ -59,19 +59,7 @@
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencenzbuildandroid" name="Skin Backgrounds NZ Build Android" version="4.1" provider-name="">
-	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
-	<requires>
-		<import addon="kodi.resource" version="1.0.0"/>
-	</requires>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack NZ Build Android</summary>
-		<description lang="en">Skin Backgrounds Pack NZ Build Android</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzau" name="Skin Backgrounds NZ AUS" version="4.6" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzau" name="Skin Backgrounds NZ AUS" version="4.7" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
