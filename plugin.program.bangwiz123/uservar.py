@@ -62,9 +62,9 @@ DESCOLOR = 'white'
 
 #Wizard title name and verion color
 WIZTITLE = 'Bang Wizard'
-WIZTITLE_COLOR = 'black'
-VERTITLE_COLOR = 'black'
-VER_NUMBER_COLOR = 'black'
+WIZTITLE_COLOR = 'white'
+VERTITLE_COLOR = 'white'
+VER_NUMBER_COLOR = 'white'
 ############################################################
 
 ## The colors and theme below is still used for the pop up dialogs

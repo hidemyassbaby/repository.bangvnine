@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
-<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="4.1" provider-name="Bang">
+<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="4.2" provider-name="Bang">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
     <import addon="script.module.six" />
@@ -71,7 +71,7 @@
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzaus" name="Skin Backgrounds NZ AUS" version="4.5" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzau" name="Skin Backgrounds NZ AUS" version="4.6" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
