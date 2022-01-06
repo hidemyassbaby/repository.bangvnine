@@ -9,8 +9,8 @@ ADDON_ID       = xbmcaddon.Addon().getAddonInfo('id')
 ADDONTITLE     = 'Bang Wizard'
 BUILDERNAME    = 'Bang Wizard'
 #########################Make sure to change the repo to yours!!!!
-EXCLUDES       = [ADDON_ID, 'roms', 'My_Builds', 'backupdir', 'script.module.kodi-six', 'script.module.six']
-BUILDFILE      = 'https://github.com/hidemyassbaby/wizland/raw/master/jannewwizmenu.txt'
+EXCLUDES       = [ADDON_ID, 'roms', 'My_Builds', 'backupdir', 'script.module.kodi-six', 'script.module.six', 'repository.bangvnine', 'plugin.program.bangwiz123']
+BUILDFILE      = 'https://github.com/hidemyassbaby/wizland/raw/master/wizard/buildurls/4.6.txt'
 UPDATECHECK    = 0
 APKFILE        = 'http://'
 YOUTUBETITLE   = 'FTG Help Videos' 
