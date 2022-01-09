@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="repository.bangbuilds" name="Bang" version="1.0" provider-name="Bang">
+<addon id="repository.bangbuilds" name="Bang Builds" version="1.1" provider-name="Bang">
 	<extension point="xbmc.addon.repository" name="Bang">
 		<dir>
 			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bangbuilds/master/zips/addons.xml</info>
