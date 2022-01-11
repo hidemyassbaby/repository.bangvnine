@@ -25,6 +25,23 @@
   </extension>
 </addon>
 
+<addon id="plugin.video.marociptv" name="Maroc IPTV" version="3.1.1" provider-name="">
+  <extension point="xbmc.python.pluginsource"
+			library="default.py">
+		<provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+	<summary lang="en">IPTV Addon</summary>
+	<language>en</language>
+	<description lang="en">Maroc IPTV - Paid IPTV</description>
+	<platform>all</platform>
+	<assets>
+		<icon>icon.png</icon>
+		<fanart>fanart.jpg</fanart>
+	</assets>
+  </extension>
+</addon>
+
 <addon id="repository.bangbuilds" name="Bang Builds" version="1.1" provider-name="Bang">
 	<extension point="xbmc.addon.repository" name="Bang">
 		<dir>
