@@ -1,0 +1,34 @@
+<settings>   
+    
+    <!-- initial settings  -->
+    <category label="Home Page">
+        <setting id="root_xml" type="text" label="Root XML Location" option="hidden" default="file://main.xml" visible="true"/>
+        <setting id="message_xml_url" type="text" label="News File Location" option="hidden" default="file://news.xml" visible="true"/>
+    </category>
+    
+    <!-- General Settings - future features for playlisters and developers -->
+    <category label="Settings">
+        <setting id="open.Osettings" subsetting="true" type="action" label="Open MicroJen Scrapers Settings" option="close" action="RunPlugin(plugin://script.module.microjenscrapers/?mode=microjenscrapersettings)" />
+        <!-- <setting id="debrid.only" type="bool" label="Debrid Sources Only" default="true" /> -->
+    </category>
+    
+    <!-- TMDB api key and access token included for test purposes only -->    
+    <!-- Developers and Playlisters need to either include their own -->    
+    <!-- or leave blank for users to use theirs -->    
+    <!-- This key and token will be deactivated in near future -->  
+    <!-- which will stop this function from working -->      
+    <category label="TMDB">
+        <setting id="tmdb.api_key" type="text" label="API Key" option="hidden" visible="true" default=""/>
+        <setting id="tmdb.access_token" type="text" label="Access Token" option="hidden" visible="true" default="" />
+    </category>
+    
+    <!-- Dev Mode - future features for playlisters and developers -->
+    <!-- Developers and Playlisters should delete this setting -->    
+    <!-- before release to prevent log file containing your information -->    
+    <category label="Dev Mode">
+        <setting id="debug" type="bool" label="Enable Debugging Mode" default="false" visible="true"/>        
+    </category>
+
+    
+
+</settings>
