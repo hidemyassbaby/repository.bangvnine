@@ -14,7 +14,8 @@ import xbmcaddon
 
 root_xml_url = ownAddon.getSetting('root_xml') or "file://main.xml"
 
-root_xml_url =  "file://scraper_list.json"
+root_xml_url ="https://github.com/hidemyassbaby/leomonade/raw/main/xml/menu/main.xml"
+#root_xml_url =  "file://scraper_list.json"
 # root_xml_url =  "file://main.json"
 # root_xml_url =  "file://main_pastebin_xml"
 # root_xml_url =  "file://main_pastebin_json"
