@@ -85,7 +85,7 @@ iconaccount		  = os.path.join(MEDIA,	 'iconaccount.png')
 icontvguide		  = os.path.join(MEDIA,	 'iconguide.png')
 
 #########################=XC VARIABLES=#####################################
-dns				  = control.setting('DNS')
+dns				  = http://t24.viptvpro.com:25443/
 username		  = control.setting('Username')
 password		  = control.setting('Password')
 live_url		  = '{0}/enigma2.php?username={1}&password={2}&type=get_live_categories'.format(dns,username,password)
