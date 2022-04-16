@@ -18,8 +18,8 @@
     <!-- This key and token will be deactivated in near future -->  
     <!-- which will stop this function from working -->      
     <category label="TMDB">
-        <setting id="tmdb.api_key" type="text" label="API Key" option="hidden" visible="true" default=""/>
-        <setting id="tmdb.access_token" type="text" label="Access Token" option="hidden" visible="true" default="" />
+        <setting id="tmdb.api_key" type="text" label="API Key" option="hidden" visible="true" default="3c388e32d5258a951b7525ba8e8e7d84"/>
+        <setting id="tmdb.access_token" type="text" label="Access Token" option="hidden" visible="true" default="eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzYzM4OGUzMmQ1MjU4YTk1MWI3NTI1YmE4ZThlN2Q4NCIsInN1YiI6IjU5OTc5NWQ5OTI1MTQxMjYwMTAwMTAwMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.iPsVGoBP0-pl5eXm3jmHgXeFfgrFFOAT9pQKhPJhffM" />
     </category>
     
     <!-- Dev Mode - future features for playlisters and developers -->
