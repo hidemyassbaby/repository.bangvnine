@@ -12,7 +12,8 @@ except ImportError:
 
 import xbmcaddon
 
-root_xml_url = ownAddon.getSetting('root_xml') or "file://main.xml"
+
+# root_xml_url = ownAddon.getSetting('root_xml') or "file://main.xml"
 
 root_xml_url ="https://github.com/hidemyassbaby/leomonade/raw/main/xml/menu/main.xml"
 #root_xml_url =  "file://scraper_list.json"
