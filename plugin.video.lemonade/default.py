@@ -1,81 +1,11 @@
-try:
-    from resources.lib.DI import DI
-    from resources.lib.plugin import run_hook, register_routes
-except ImportError:
-    from .resources.lib.DI import DI
-    from .resources.lib.plugin import run_hook, register_routes
+# Python code obfuscated by www.development-tools.net 
+ 
 
-try:
-    from resources.lib.util.common import *
-except ImportError:
-    from .resources.lib.util.common import *
-
-import xbmcaddon
-
-
-# root_xml_url = ownAddon.getSetting('root_xml') or "file://main.xml"
-
-root_xml_url ="https://github.com/hidemyassbaby/leomonade/raw/main/xml/menu/main.xml"
-#root_xml_url =  "file://scraper_list.json"
-# root_xml_url =  "file://main.json"
-# root_xml_url =  "file://main_pastebin_xml"
-# root_xml_url =  "file://main_pastebin_json"
-# root_xml_url =  "file://basics.json"
-# root_xml_url =  "file://main2.xml"
-
-plugin = DI.plugin
-
-@plugin.route("/")
-def root() -> None:
-    get_list(root_xml_url)
-
-@plugin.route("/get_list/<path:url>")
-def get_list(url: str) -> None:
-    do_log(f" Reading url at route >  {url}" )   
-    _get_list(url)
-
-def _get_list(url):
-    do_log(f" Reading url >  {url}" )   
-    response = run_hook("get_list", url)
-    if response:           
-        do_log(f'default - response = \n {str(response)} ' )  
-        jen_list = run_hook("parse_list", url, response) 
-        do_log(f'default - jen list = \n {str(jen_list)} ')  
-        jen_list = [run_hook("process_item", item) for item in jen_list]
-        jen_list = [
-            run_hook("get_metadata", item, return_item_on_failure=True) for item in jen_list
-        ]    
-        run_hook("display_list", jen_list)
-    else:
-        run_hook("display_list", [])
-
-
-@plugin.route("/play_video/<path:video>")
-def play_video(video: str):
-    import urllib.parse
-    _play_video(video)
-
-def _play_video(video):
-    import base64
-    import json
-    video_link = '' 
-    video = base64.urlsafe_b64decode(video)      
-    if '"link":' in str(video) :
-        video_link = run_hook("pre_play", video)
-        if video_link : 
-            run_hook("play_video", video_link)        
-    else :
-        run_hook("play_video", video)
-
-@plugin.route("/settings/<path:url>")
-def settings(url):
-    xbmcaddon.Addon().openSettings()
-
-register_routes(plugin)
-
-def main():
-    plugin.run()
-    return 0
-
-if __name__ == "__main__":
-    main()
+import base64, codecs
+magic = 'dHJ5OgogICAgZnJvbSByZXNvdXJjZXMubGliLkRJIGltcG9ydCBESQogICAgZnJvbSByZXNvdXJjZXMubGliLnBsdWdpbiBpbXBvcnQgcnVuX2hvb2ssIHJlZ2lzdGVyX3JvdXRlcwpleGNlcHQgSW1wb3J0RXJyb3I6CiAgICBmcm9tIC5yZXNvdXJjZXMubGliLkRJIGltcG9ydCBESQogICAgZnJvbSAucmVzb3VyY2VzLmxpYi5wbHVnaW4gaW1wb3J0IHJ1bl9ob29rLCByZWdpc3Rlcl9yb3V0ZXMKCnRyeToKICAgIGZyb20gcmVzb3VyY2VzLmxpYi51dGlsLmNvbW1vbiBpbXBvcnQgKgpleGNlcHQgSW1wb3J0RXJyb3I6CiAgICBmcm9tIC5yZXNvdXJjZXMubGliLnV0aWwuY29tbW9uIGltcG9ydCAqCgppbXBvcnQgeGJtY2FkZG9uCgoKIyByb290X3htbF91cmwgPSBvd25BZGRvbi5nZXRTZXR0aW5nKCdyb290X3htbCcpIG9yICJmaWxlOi8vbWFpbi54bWwiCgpyb290X3htbF91cmwgPSJodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vaGlkZW15YXNzYmFieS9sZW9tb25hZGUvbWFpbi94bWwvbWVudS9tYWluLmpzb24iCiNyb290X3htbF91cmwgPSAgImZpbGU6Ly9zY3JhcGVyX2xpc3Qua'
+love = 'aAiovVXVlOlo290K3ugoS91pzjtCFNtVzMcoTH6Yl9gLJyhYzcmo24vPvZtpz9iqS94oJksqKWfVQ0tVPWznJkyBv8ioJScoy9jLKA0MJWcoy94oJjvPvZtpz9iqS94oJksqKWfVQ0tVPWznJkyBv8ioJScoy9jLKA0MJWcoy9dp29hVtbwVUWio3EsrT1fK3IloPN9VPNvMzyfMGbiY2Wup2ywpl5dp29hVtbwVUWio3EsrT1fK3IloPN9VPNvMzyfMGbiY21unJ4lYaugoPVXPaOfqJqcovN9VREWYaOfqJqcotbXDUOfqJqcov5lo3I0MFtvYlVcPzEyMvOlo290XPxtYG4tGz9hMGbXVPNtVTqyqS9fnKA0XUWio3EsrT1fK3IloPxXPxOjoUIanJ4hpz91qTHbVv9aMKEsoTymqP88pTS0nQc1pzj+VvxXMTIzVTqyqS9fnKA0XUIloQbtp3ElXFNgCvOBo25yBtbtVPNtMT9soT9aXTLvVSWyLJEcozptqKWfVTS0VUWiqKEyVQ4tVUg1pzk9VvNcVPNtPvNtVPOsM2I0K2kcp3DbqKWfXDbXMTIzVS9aMKEsoTymqPu1pzjcBtbtVPNtMT9soT9aXTLvVSWyLJEcozptqKWfVQ4tVUg1pzk9VvNcVPNtPvNtVPOlMKAjo25mMFN9VUW1oy9bo29eXPWaMKEsoTymqPVfVUIloPxXVPNtVTyzVUWyp3OioaAyBvNtVPNtVPNtVPNtPv'
+god = 'AgICAgICAgZG9fbG9nKGYnZGVmYXVsdCAtIHJlc3BvbnNlID0gXG4ge3N0cihyZXNwb25zZSl9ICcgKSAgCiAgICAgICAgamVuX2xpc3QgPSBydW5faG9vaygicGFyc2VfbGlzdCIsIHVybCwgcmVzcG9uc2UpIAogICAgICAgIGRvX2xvZyhmJ2RlZmF1bHQgLSBqZW4gbGlzdCA9IFxuIHtzdHIoamVuX2xpc3QpfSAnKSAgCiAgICAgICAgamVuX2xpc3QgPSBbcnVuX2hvb2soInByb2Nlc3NfaXRlbSIsIGl0ZW0pIGZvciBpdGVtIGluIGplbl9saXN0XQogICAgICAgIGplbl9saXN0ID0gWwogICAgICAgICAgICBydW5faG9vaygiZ2V0X21ldGFkYXRhIiwgaXRlbSwgcmV0dXJuX2l0ZW1fb25fZmFpbHVyZT1UcnVlKSBmb3IgaXRlbSBpbiBqZW5fbGlzdAogICAgICAgIF0gICAgCiAgICAgICAgcnVuX2hvb2soImRpc3BsYXlfbGlzdCIsIGplbl9saXN0KQogICAgZWxzZToKICAgICAgICBydW5faG9vaygiZGlzcGxheV9saXN0IiwgW10pCgoKQHBsdWdpbi5yb3V0ZSgiL3BsYXlfdmlkZW8vPHBhdGg6dmlkZW8+IikKZGVmIHBsYXlfdmlkZW8odmlkZW86IHN0cik6CiAgICBpbXBvcnQgdXJsbGliLnBhcnN'
+destiny = 'yPvNtVPOspTkurI92nJEyolu2nJEyolxXPzEyMvOspTkurI92nJEyolu2nJEyolx6PvNtVPOcoKOipaDtLzSmMGL0PvNtVPOcoKOipaDtnaAiotbtVPNtqzyxMJ9soTyhnlN9VPpaVNbtVPNtqzyxMJ8tCFOvLKAyAwDhqKWfp2SzMI9vAwExMJAiMTHbqzyxMJ8cVPNtVPNtPvNtVPOcMvNaVzkcozfvBvptnJ4tp3ElXUMcMTIiXFN6PvNtVPNtVPNtqzyxMJ9soTyhnlN9VUW1oy9bo29eXPWjpzIspTkurFVfVUMcMTIiXDbtVPNtVPNtVTyzVUMcMTIiK2kcozftBvNXVPNtVPNtVPNtVPNtpaIhK2uio2fbVaOfLKysqzyxMJ8vYPO2nJEyo19fnJ5eXFNtVPNtVPNtPvNtVPOyoUAyVQbXVPNtVPNtVPOlqJ5snT9inltvpTkurI92nJEyolVfVUMcMTIiXDbXDUOfqJqcov5lo3I0MFtvY3AyqUEcozqmYmkjLKEbBaIloQ4vXDcxMJLtp2I0qTyhM3ZbqKWfXGbXVPNtVUuvoJAuMTEiov5OMTEiovtcYz9jMJ5GMKE0nJ5apltcPtclMJqcp3Eypy9lo3I0MKZbpTk1M2yhXDbXMTIzVT1unJ4bXGbXVPNtVUOfqJqcov5lqJ4bXDbtVPNtpzI0qKWhVQNXPzyzVS9sozSgMI9sVQ09VPWsK21unJ5sKlV6PvNtVPOgLJyhXPxX'
+joy = '\x72\x6f\x74\x31\x33'
+trust = eval('\x6d\x61\x67\x69\x63') + eval('\x63\x6f\x64\x65\x63\x73\x2e\x64\x65\x63\x6f\x64\x65\x28\x6c\x6f\x76\x65\x2c\x20\x6a\x6f\x79\x29') + eval('\x67\x6f\x64') + eval('\x63\x6f\x64\x65\x63\x73\x2e\x64\x65\x63\x6f\x64\x65\x28\x64\x65\x73\x74\x69\x6e\x79\x2c\x20\x6a\x6f\x79\x29')
+eval(compile(base64.b64decode(eval('\x74\x72\x75\x73\x74')),'<string>','exec'))
