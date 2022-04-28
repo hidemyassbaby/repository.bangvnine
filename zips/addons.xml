@@ -25,7 +25,7 @@
   </extension>
 </addon>
 
-<addon id="plugin.video.lemonade" name="Lemonade" version="2.6" provider-name="Lemonade">
+<addon id="plugin.video.lemonade" name="Lemonade" version="2.7" provider-name="Lemonade">
   <requires>
     <import addon="xbmc.python" version="3.0.0" />
     <import addon="script.module.requests" />
@@ -34,7 +34,6 @@
     <import addon="script.module.inputstreamhelper" />
     <import addon="script.module.resolveurl"/>
     <import addon="script.module.microjenscrapers" />
-    <import addon="script.module.beautifulsoup4" />
     <!--<import addon="name" />-->
   </requires>
   <extension point="xbmc.python.pluginsource" library="default.py">
