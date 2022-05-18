@@ -32,8 +32,8 @@ class default_process_item(Plugin):
             del item["contextmenu"]
         if link:
             if tag == "dir":
-                if link.endswith(".m3u"):
-                    link = f"{link}a"
+                if link.endswith(".m3u") or link.endswith(".m3u8"):
+                    link = f"m3u|{link}"
                 link = f"/get_list/{link}"
                 is_dir = True
                 
