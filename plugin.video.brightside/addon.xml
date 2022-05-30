@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.brightside" name="BRIGHT SIDE" version="2.1" provider-name="Bang">
+<addon id="plugin.video.brightside" name="BRIGHT SIDE" version="2.2" provider-name="Bang">
   <requires>
     <import addon="xbmc.python" version="3.0.0" />
     <import addon="script.module.requests" />
@@ -14,7 +14,7 @@
     <provides>video</provides>
   </extension>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Lemonade</summary>
+    <summary lang="en_GB">Bright Side</summary>
      <description>Whether you’re into recent discoveries, space exploration, true stories, fitness, fun tests, and riddles, or useful tips for self-improvement, psychology, gadgets, or just your day-to-day routine, there’s something for everyone!
 
 You can expect all that and more coming at you in 3 top-quality videos every single day. If you’ve got a thirst for knowledge that never quits, then join a community of tens of millions and growing! We have a good time, so take your shoes off, kick back, and make yourself at home here on the Bright Side of life!</description>
