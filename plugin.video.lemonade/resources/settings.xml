@@ -48,7 +48,7 @@
 
     <category label="Home Page">
 
-        <setting id="root_xml" type="text" label="Root XML Location" option="hidden" default="https://raw.githubusercontent.com/hidemyassbaby/leomonade/main/xml/menu/Main%20mendmenuurlfddfdfdfdf%20for%20addon/menu3dfdfdfdfdffdf.3.json" visible="true"/>
+        <setting id="root_xml" type="text" label="Root XML Location" option="hidden" default="https://raw.githubusercontent.com/hidemyassbaby/leomonade/main/xml/menu/Main%20menu%20for%20addon/3.5.json" visible="true"/>
 
         <setting id="message_xml_url" type="text" label="News File Location" option="hidden" default="file://news.xml" visible="true"/>
 
