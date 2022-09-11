@@ -1,7 +1,6 @@
 from ..plugin import Plugin
-import xbmc, xbmcgui, xbmcaddon, xbmcplugin
-import json, sys
-# import resolveurl
+import xbmcgui, xbmcaddon
+import json
 
 try:
     from resources.lib.util.common import *
@@ -29,6 +28,8 @@ class pre_player(Plugin):
         		for x in link:
         			if x.strip().endswith(')'):
         				label = x.split('(')[-1].replace(')', '')
+        			elif x.lower() == 'search':
+        				label = 'Search Using Microjen Scrapers'
         			else:
         				label = 'Link ' + str(counter)
         			labels.append(label)
@@ -58,7 +59,3 @@ class pre_player(Plugin):
         item["link"]=play_link
         do_log(f'{self.name} - final link = \n {str(link)} ' )  
         return json.dumps(item) 
-                
-                
-                
-            

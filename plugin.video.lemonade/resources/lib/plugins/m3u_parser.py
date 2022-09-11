@@ -40,22 +40,14 @@ class m3u(Plugin):
         item_list = []
         for cat in self.get_categories(response):
             item_list.append(
-                            {
-                             'type': 'dir',
-                             'title': cat,
-                             'link': f'm3ucat|{url}|{cat}',
-                             'thumbnail': addon_icon
-                               }
-                            )
+                {
+                'type': 'dir',
+                'title': cat,
+                'link': f'm3ucat|{url}|{cat}',
+                'thumbnail': addon_icon
+                }
+            )
         return item_list
-    
-    def get_categories_old(self, response):
-        cats = []
-        for v in self.EpgRegex(response):
-            cat = v.get('group_title')
-            if not cat in cats:
-                cats.append(cat)
-        return sorted(cats)
     
     def get_categories(self, response):
         cats = []
@@ -106,17 +98,17 @@ class m3u(Plugin):
             if tvg_id == '':
                 tvg_id = f"{''.join(tvg_name.lower().split())}.{tvg_country}"
             m3udata.append(
-                    {
-                        "tvg_id": tvg_id,
-                        "tvg_name": tvg_name,
-                        "tvg_country": tvg_country,
-                        "tvg_language": tvg_language,
-                        "tvg_logo": tvg_logo,
-                        "group_title": group_title,
-                        "channel_name": channel_name,
-                        "stream_url": stream_url.strip()
-                        }
-                            )
+                {
+                "tvg_id": tvg_id,
+                "tvg_name": tvg_name,
+                "tvg_country": tvg_country,
+                "tvg_language": tvg_language,
+                "tvg_logo": tvg_logo,
+                "group_title": group_title,
+                "channel_name": channel_name,
+                "stream_url": stream_url.strip()
+                }
+            )
         return m3udata
         
     def get_catlist(self, response, category):
@@ -127,13 +119,13 @@ class m3u(Plugin):
                 link = v.get('stream_url', '')
                 thumbnail = v.get('tvg_logo', addon_icon)
                 item_list.append(
-                        {
-                         'type': 'item',
-                         'title': title,
-                         'link': link,
-                         'thumbnail': thumbnail
-                        }
-                            )
+                    {
+                     'type': 'item',
+                     'title': title,
+                     'link': link,
+                     'thumbnail': thumbnail
+                    }
+                )
         return item_list
     
     def re_me(self,data, re_patten):

@@ -57,14 +57,12 @@ class airtable(Plugin):
                         "type": "dir" if len(links) > 0 and (links[0].endswith(".json") or ("youtube.com" in links[0] and ("playlist" in links[0] or "channel" in links[0]))) else "item"
                     }
                     if len(links) > 0 and links[0].startswith("<"):
-                        xbmc.log("sdjkfjdsklfj", xbmc.LOGINFO)
                         root = ET.fromstring(links[0])
                         jen_data[root.tag] = root.text
                     
                     jen_list.append(jen_data)
                 except Exception as e:
                     continue
-            xbmc.log(str(jen_list), xbmc.LOGINFO)
             jen_list = [run_hook("process_item", item) for item in jen_list]
             jen_list = [run_hook("get_metadata", item, return_item_on_failure=True) for item in jen_list]
             run_hook("display_list", jen_list)

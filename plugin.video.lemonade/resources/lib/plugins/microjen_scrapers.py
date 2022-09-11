@@ -18,7 +18,7 @@ except ImportError:
 debrid_only = ownAddon.getSetting('debrid.only') or 'false'
 addon_name = xbmcaddon.Addon().getAddonInfo('name')
 
-TIMEOUT = 10
+TIMEOUT = 8
 
 class MicroJenScrapers(Plugin):
     name = "microjenscrapers"
@@ -200,7 +200,7 @@ class MicroJenScrapers(Plugin):
 
             all_sources = sorted(all_sources, key=operator.itemgetter("quality"))
             play_sources = [
-                f"{item['origin']} - {item['source']} - {str(item['quality']).replace('.','')}"
+                f"{item['origin']} - {item['source']} - {str(item['quality']).replace('.','')} - {item.get('info', 'Size Unknown')}"
                 for item in all_sources
             ]
             selected = xbmcgui.Dialog().select("Select a Link", play_sources)
@@ -210,8 +210,11 @@ class MicroJenScrapers(Plugin):
                 default_icon = xbmcaddon.Addon().getAddonInfo('icon')
                 title = item["title"]
                 thumbnail = item.get("thumbnail", default_icon)
+                plot = item.get("summary", "")
+                #if item.get("infolabels", ""):
+                    #plot = item["infolabels"]["plot"]
                 liz = xbmcgui.ListItem(title)
-                liz.setInfo('video', {'Title': title})
+                liz.setInfo('video', {'title': title, "plot": plot})
                 liz.setArt({'thumb': thumbnail, 'icon': thumbnail})
 
                 if resolveurl.HostedMediaFile(all_sources[selected]["url"]).valid_url():                    

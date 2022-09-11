@@ -1,6 +1,5 @@
 from ..plugin import Plugin
 from ..DI import DI
-import xml.etree.ElementTree as ET
 import json, xbmc, requests, re
 
 class youtube(Plugin):

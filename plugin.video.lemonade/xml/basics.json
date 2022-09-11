@@ -1,13 +1,6 @@
 {
     "items": [     
         { 
-            "title": "[COLOR khaki]Open Addon Settings [/COLOR]", 
-            "type": "item", 
-            "link": "settings", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        { 
             "title": "[COLOR khaki]Authorise Resolveurl[/COLOR]", 
             "type": "plugin", 
             "link": "resolveurl_auth", 
@@ -21,109 +14,134 @@
             "thumbnail": "", 
             "fanart": ""
         }, 
+        { 
+            "title": "[COLOR khaki]Open Addon Settings [/COLOR]", 
+            "type": "item", 
+            "link": "settings", 
+            "thumbnail": "", 
+            "fanart": ""
+        }, 
         {
-            "content": "movie",
-            "imdb": "tt0120903",
-            "link": [
-                "https://1fichier.com/?sj0fh64txn0hes2ion79",
-                "http://rapidgator.net/file/cfd54f87937c4d7861a2b80469903563/X-Men.2000.1080p.BluRay.x265.HEVC.10bit.AAC.5.1.Tigole-QxR.mkv.html",
-                "http://ignore"
-            ],
-            "thumbnail": "https://image.tmdb.org/t/p/original/ugKiyA4HMd16m3mxXVDeNlQV7xN.jpg",
-            "title": "[COLORskyblue]X-MEN (2000) [COLOR white](Sub Links)[/COLOR]",
             "type": "item",
-            "year": "2000"
+            "title": "[COLOR khaki]Clear Cache[/COLOR]",
+            "link": "clear_cache"
         }, 
         { 
             "type": "item", 
-            "title": "[COLOR orange]DailyMotion Video Link [COLOR white](Method 1)[/COLOR]", 
-            "link": "plugin://plugin.video.dailymotion_com/?url=x81h7bd&mode=playVideo", 
-            "thumbnail": "",
-            "fanart": ""
-        }, 
-        {
-            "type": "item", 
-            "title": "[COLOR orange]DailyMotion Video Link [COLOR white](Method 2) [/COLOR]", 
-            "link": "dailymotion?url=x81h7bd&mode=playVideo", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        {
-            "type": "plugin", 
-            "title": "[COLOR yellow]DailyMotion Channel List [COLOR white](Method 1)[/COLOR]", 
-            "link": "plugin://plugin.video.dailymotion_com/?mode=sortVideos1&url=channel:sport", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        {
-            "type": "plugin", 
-            "title": "[COLOR yellow]DailyMotion Channel List [COLOR white](Method 2) [/COLOR]", 
-            "link": "dailymotion?mode=sortVideos1&url=channel:sport", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        { 
-            "type": "dir", 
-            "title": "[COLOR red]YouTube Channel[/COLOR]", 
-            "link": "https://www.youtube.com/channel/UC-jBkGiRokRd-B2ylx1VqJQ", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        { 
-            "type": "dir", 
-            "title": "[COLOR red]YouTube Playlist[/COLOR]", 
-            "link": "https://www.youtube.com/playlist_list=PLyEyQCZKWQANYNwvgIS0ogI6xxP2C-5Tx", 
+            "title": "[COLOR khaki]Pop Up Message [COLOR white][I] (Message from Link) [/COLOR][/I]", 
+            "link": "message/POP UP MESSAGE TEXT", 
             "thumbnail": "", 
             "fanart": ""
         }, 
         { 
             "type": "item", 
-            "title": "[COLOR red]YouTube Video[COLOR white] (Method 1) [/COLOR]", 
-            "link": "https://www.youtube.com/watch?v=vNBw9MLqYSY", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        { 
-            "type": "item", 
-            "title": "[COLOR red]YouTube Video[COLOR white] (Method 2) [/COLOR]", 
-            "link": "https://www.youtube.com/embed/XNSKIg1o5Sg", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        { 
-            "type": "item", 
-            "title": "[COLOR orange]Pop Up Message [COLOR white] (Method 1) [/COLOR]", 
-            "link": "message/POP UP MESSAGE TEST", 
-            "thumbnail": "", 
-            "fanart": ""
-        }, 
-        { 
-            "type": "item", 
-            "title": "[COLOR orange]Pop Up Message[COLOR white] (Method 2) [/COLOR]", 
+            "title": "[COLOR khaki]Pop Up Message[COLOR white][I] (Message from URL) [/COLOR][/I]", 
             "link": "message/http://narcacist.com/fourk/4k.xml", 
             "thumbnail": "", 
             "fanart": ""
         }, 
         { 
             "type": "item", 
-            "title": "[COLOR yellow]Pop Up Message[COLOR white] (Method 3 - Local) [/COLOR]", 
+            "title": "[COLOR khaki]Pop Up Message[COLOR white][I] (Message from Local File) [/COLOR][/I]", 
             "link": "message/file://info.xml", 
+            "thumbnail": "", 
+            "fanart": ""
+        }, 
+        
+        {
+            "type": "dir",
+            "title": "[COLOR goldenrod]M3U List[/COLOR]",
+            "link": "https://iptv-org.github.io/iptv/index.m3u"
+        },
+        {
+            "type": "dir",
+            "title": "[COLOR goldenrod]Fluxus[/COLOR]",
+            "link": "https://bitbucket.org/!api/2.0/snippets/fluxustv/KpaEKX/e5b158cbb964a9ca8b478a07e0e726154c948981/files/FTV-ENG"
+        }, 
+        
+        
+        
+              
+        
+        { 
+            "type": "item", 
+            "title": "[COLOR skyblue]DailyMotion Video Link [COLOR white][I](Item Method 1)[/COLOR][/I]", 
+            "link": "plugin://plugin.video.dailymotion_com/?url=x81h7bd&mode=playVideo", 
+            "thumbnail": "",
+            "fanart": ""
+        }, 
+        {
+            "type": "item", 
+            "title": "[COLOR skyblue]DailyMotion Video Link [COLOR white][I](Item Method 2) [/COLOR][/I]", 
+            "link": "plugin.video.dailymotion_com?url=x81h7bd&mode=playVideo", 
+            "thumbnail": "", 
+            "fanart": ""
+        }, 
+        {
+            "type": "plugin", 
+            "title": "[COLOR skyblue]DailyMotion Channel [COLOR white][I](Plugin Method 1)[/COLOR][/I]", 
+            "link": "plugin://plugin.video.dailymotion_com/?mode=sortVideos1&url=channel:sport", 
+            "thumbnail": "", 
+            "fanart": ""
+        }, 
+        {
+            "type": "plugin", 
+            "title": "[COLOR skyblue]DailyMotion Channel [COLOR white][I](Plugin Method 2) [/COLOR][/I]", 
+            "link": "dailymotion?mode=sortVideos1&url=channel:sport", 
+            "thumbnail": "", 
+            "fanart": ""
+        }, 
+        
+        
+        
+        {
+            "type": "plugin", 
+            "title": "[COLOR khaki]YouTube Channel [COLOR white][I](Plugin Method) [/COLOR][/I]", 
+            "link": "plugin.video.youtube/channel/UC-jBkGiRokRd-B2ylx1VqJQ", 
+            "thumbnail": "", 
+            "fanart": ""
+        },         
+        {
+            "type": "plugin", 
+            "title": "[COLOR khaki]YouTube Playlist [COLOR white][I](Plugin Method) [/COLOR][/I]", 
+            "link": "plugin.video.youtube/playlist/PLIhM97erOwwNrksoDBN1iRIAFMsvn4cTq/", 
+            "thumbnail": "", 
+            "fanart": ""
+        },              
+        { 
+            "type": "dir", 
+            "title": "[COLOR khaki]YouTube Channel [COLOR white][I](Dir Method)[/COLOR][/I]", 
+            "link": "https://www.youtube.com/channel/UC-jBkGiRokRd-B2ylx1VqJQ", 
+            "thumbnail": "", 
+            "fanart": ""
+        }, 
+        { 
+            "type": "dir", 
+            "title": "[COLOR khaki]YouTube Playlist [COLOR white][I](Dir Method)[/COLOR][/I]", 
+            "link": "https://www.youtube.com/playlist_list=PLyEyQCZKWQANYNwvgIS0ogI6xxP2C-5Tx",             
+            "thumbnail": "", 
+            "fanart": ""
+        }, 
+        { 
+            "type": "item", 
+            "title": "[COLOR khaki]YouTube Video[COLOR white][I] (Item Method) [/COLOR][/I]", 
+            "link": "https://www.youtube.com/watch?v=vNBw9MLqYSY", 
             "thumbnail": "", 
             "fanart": ""
         }, 
        {
             "type":"plugin",
-            "title":"[COLOR red]Example Plugin with args[COLOR slategrey] (Method only) [/COLOR] ",
+            "title":"[COLOR skyblue]Example Plugin with args[COLOR white][I] (Method only) [/COLOR][/I] ",
             "link":"plugin.video.foobar?url=https://someurl.com&mode=12",
             "thumbnail":"",
             "fanart":""
-        }, 
-       {
-            "type":"script",
-            "title":"[COLOR red]AddonRestart[/COLOR]",
-            "link":"script?script=special://home/addons/plugin.video.microjen/resources/lib/scripts/addonrestart.py&args=plugin.video.microjen&args=Addon Restarting please wait",
-            "thumbnail":"",
-            "fanart":""
         },
+        { 
+            "type": "dir", 
+            "title": "[COLOR khaki]TMDB Examples[/COLOR]", 
+            "link": "file://scraper_list.json", 
+            "thumbnail": "", 
+            "fanart": ""
+        }
     ]
 }

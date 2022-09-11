@@ -1,3 +1,4 @@
+import json
 import xbmc
 import xbmcaddon
 import xbmcgui
@@ -53,11 +54,12 @@ class plugplay(Plugin):
                         return
                         
                 if xbmc.getCondVisibility(f'System.HasAddon({addon_id})'):    
-                    if not this_link.startswith('plugin://') :
-                        this_link ='plugin://' + this_link              
+                    this_link ='plugin://' + this_link              
                     if 'play' in this_link.lower() :      
                         xbmc.executebuiltin(f'PlayMedia({this_link})')   
                     else :
-                        xbmc.executebuiltin("ActivateWindow({} , {} , return)".format('10025', this_link))             
+                        xbmc.executebuiltin("ActivateWindow({} , {} , return)".format('10025', this_link))     
+                        
+                        
                 else:
                     return

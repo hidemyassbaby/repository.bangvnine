@@ -4,74 +4,89 @@
 <!----   DO NOT EDIT ABOVE THIS LINE!!!  BASIC OBFUSCATION METHODS!!!-->
 
 <xml>
+    
+  <plugin>
+    <title>[COLOR khaki]Authorise Resolveurl [/COLOR]</title>
+    <link>resolveurl_auth</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>    
+  </plugin>
+    
+  <plugin>
+    <title>[COLOR khaki]Open ResolveURL Settings[/COLOR]</title>
+    <link>resolveurl_settings</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>    
+  </plugin>
+     
+  <item>
+    <title>[COLOR khaki]Open Addon Settings [/COLOR]</title>
+    <link>settings</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>    
+  </item>
+  
+  <item>
+    <title>[COLOR khaki]Clear Cache[/COLOR]</title>
+    <link>clear_cache</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>    
+  </item>
+  
+  <item>
+    <title>[COLOR khaki]Pop Up Message [COLOR white][I](Message from Link) [/COLOR][/I]</title>
+    <link>message/POP UP MESSAGE TEXT</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>    
+  </item>
+      
+  <item>
+    <title>[COLOR khaki]Pop Up Message[COLOR white][I] (Message from URL) [/COLOR][/I]</title>
+    <link>message/http://narcacist.com/fourk/4k.xml</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>    
+  </item>
+    
+  <item>
+    <title>[COLOR khaki]Pop Up Message[COLOR white][I] (Message from Local File) [/COLOR][/I]</title>
+    <link>message/file://search_info.xml</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>    
+  </item>
+  
   <dir>
-    <title>Various Methods</title>
+    <title>[COLOR skyblue]Various Addon Methods[/COLOR]</title>
     <link>file://basics.json</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>
+  </dir>
+    
+  <dir>
+    <title>[COLOR skyblue]Kodi Colours[/COLOR]</title>
+    <link>file://colors.json</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>
+  </dir>
+  
+  <plugin>
+	<title>[COLOR goldenrod]YouTube Playlist [COLOR white][I](Plugin Method) [/COLOR][/I]</title>
+	<link>plugin://plugin.video.youtube/playlist/PLIhM97erOwwNrksoDBN1iRIAFMsvn4cTq/</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>
+  </plugin>
+  
+  <dir>
+    <title>[COLOR khaki]Scraper Methods[/COLOR]</title>
+    <link>file://scraper_list.json</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>
   </dir>
   
   <dir>
-    <name>Formats</name>
-    <link>file://formats/main.xml</link>
+    <title>[COLOR khaki]Single Item TMDB Examples[/COLOR]</title>
+    <link>file://scraper_list2.json</link>
+	<thumbnail></thumbnail>
+	<fanart></fanart>
   </dir>
-
-  <dir>
-    <title>Shared Lists</title>
-    <link>file://shared lists/main.xml</link>
-    <summary></summary>
-  </dir>
-
-  <dir>
-    <title>Json example</title>
-    <link>file://formats/main.json</link>
-  </dir>
-
-  <item>
-    <title>Dabs k19 help Create Custom RSS feed for kodi 19</title>
-    <link>youtube/J1wVVPZ2DGI</link>
-  </item>
-  
-   <dir>
-    <title>Youtube example</title>
-    <link>file://shared lists/youtube.json</link>
-  </dir>
-
-  <item>
-    <title>art of the dead</title>		
-    <summary>When a man purchases a collection of seven paintings to hang in his wealthy estate, he has no idea what horrors he has unleashed for himself and his family.</summary>
-    <thumbnail>https://www.themoviedb.org/t/p/w600_and_h900_bestv2/l3CCtoklH4uPn5zFgJZhastTxZ9.jpg</thumbnail>
-    <content>movie</content>
-    <tmdb_id>633159</tmdb_id>    
-  </item>
-
-  <item>
-    <title>1x1: Filmed Before a Live Studio Audience</title>		
-    <summary>Wanda and Vision struggle to conceal their powers during dinner with Vision’s boss and his wife.</summary>
-    <content>episode</content>
-    <tmdb_id>85271</tmdb_id>
-    <thumbnail>https://www.themoviedb.org/t/p/original/oNCzeCXFanVEWNpzRzyffhLLfZs.jpg</thumbnail>
-    <fanart>https://www.themoviedb.org/t/p/w533_and_h300_bestv2/1i1N0AVRb54H6ZFPDTwbo9MLxSF.jpg</fanart>
-    <season>1</season>
-    <episode>1</episode>
-  </item>  
-  
-  <item>
-    <title>[COLORorange]X-MEN (2000)[/COLOR]</title>
-    <meta>
-        <content>movie</content>
-        <imdb>tt0120903</imdb>
-        <title></title>
-        <year>2000</year>
-        <genre></genre>
-    </meta>
-    <link>
-        <sublink>https://1fichier.com/?sj0fh64txn0hes2ion79</sublink>
-        <sublink>http://rapidgator.net/file/cfd54f87937c4d7861a2b80469903563/X-Men.2000.1080p.BluRay.x265.HEVC.10bit.AAC.5.1.Tigole-QxR.mkv.html</sublink>
-        <sublink>http://ignore</sublink>
-    </link>
-    <thumbnail>https://image.tmdb.org/t/p/original/ugKiyA4HMd16m3mxXVDeNlQV7xN.jpg</thumbnail>
-    <fanart></fanart>
-    </item>
-
-  
 
 </xml>
