@@ -89,6 +89,17 @@
             "type": "dir",
             "title": "[B][COLORkhaki]Search TV Shows[/COLOR][/B]",
             "link": "tmdb/search/tv"
+        },
+		{
+            "type": "dir",
+            "title": "[B][COLORkhaki]Netflix TV Shows[/COLOR][/B]",
+            "link": "tmdb/network/tv/213"
+        },
+		{
+            "type": "dir",
+            "title": "[B][COLORkhaki]Netflix TV Shows[/COLOR][/B]",
+            "link": "tmdb/network/movie/213"
         }
+		
     ]
 }

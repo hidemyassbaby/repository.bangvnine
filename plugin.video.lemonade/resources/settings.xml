@@ -16,7 +16,7 @@
 
         <setting id="item_meta" type="bool" label="[COLOR khaki]    Fetch Metadata For Manually Made Lists [I][COLOR white](Slow Loading)[/I][/COLOR]" subsetting="true" visible="eq(-1,true)" default="false" />
 
-        <setting id="open.Osettings" subsetting="false" type="action" label="[COLOR deepskyblue]Open Lemonade Scrapers Settings[/COLOR]" option="close" action="RunPlugin(plugin://script.module.microjenscrapers/?mode=microjenscrapersettings)" />
+        <setting id="open.Osettings" subsetting="false" type="action" label="[COLOR deepskyblue]Open MicroJen Scrapers Settings[/COLOR]" option="close" action="RunPlugin(plugin://script.module.microjenscrapers/?mode=microjenscrapersettings)" />
 
         <!-- <setting id="debrid.only" type="bool" label="Debrid Sources Only" default="true" /> -->
 
@@ -36,9 +36,9 @@
 
     <category label="TMDB">
 
-        <setting id="tmdb.api_key" type="text" label="3c388e32d5258a951b7525ba8e8e7d84" option="hidden" visible="true" default=""/>
+        <setting id="tmdb.api_key" type="text" label="API Key" option="hidden" visible="true" default="0a66c52089e5b0756f86589d928a2c06"/>
 
-        <setting id="tmdb.access_token" type="text" label="eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzYzM4OGUzMmQ1MjU4YTk1MWI3NTI1YmE4ZThlN2Q4NCIsInN1YiI6IjU5OTc5NWQ5OTI1MTQxMjYwMTAwMTAwMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.iPsVGoBP0-pl5eXm3jmHgXeFfgrFFOAT9pQKhPJhffM" option="hidden" visible="true" default="" />
+        <setting id="tmdb.access_token" type="text" label="Access Token" option="hidden" visible="true" default="eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwYTY2YzUyMDg5ZTViMDc1NmY4NjU4OWQ5MjhhMmMwNiIsInN1YiI6IjYxZmQ0NWQ3Y2U5OTdhMDA0NDYxMGRmZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Zezp0YNMzgRnxeZV9Jada2j9mNoRqLNjOeE3rNI_mzQ" />
 
     </category>
 

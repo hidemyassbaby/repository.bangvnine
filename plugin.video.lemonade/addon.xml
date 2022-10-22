@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.lemonade" name="Lemonade" version="5.1" provider-name="Lemonade">
+<addon id="plugin.video.lemonade" name="Lemonade" version="5.5" provider-name="Lemonade">
   <requires>
     <import addon="xbmc.python" version="3.0.0" />
     <import addon="script.module.requests" />
@@ -18,9 +18,9 @@
     <platform>all</platform>
     <language>en</language>
     <license>GPL-2.0-or-later</license>
-	<assets>
-		<icon>icon.png</icon>
-		<fanart>fanart.jpg</fanart>
+  <assets>
+    <icon>icon.png</icon>
+    <fanart>fanart.jpg</fanart>
   </assets>
   </extension>
 </addon>
