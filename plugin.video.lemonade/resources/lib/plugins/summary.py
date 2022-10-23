@@ -4,7 +4,7 @@ from ..plugin import Plugin
 class Summary(Plugin):
     name = "summary"
     description = "summary tag support"
-    priority = 200
+    priority = 300
 
     def get_metadata(self, item):
         if "summary" in item:
