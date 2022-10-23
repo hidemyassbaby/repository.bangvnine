@@ -55,7 +55,7 @@ You can expect all that and more coming at you in 3 top-quality videos every sin
   </extension>
 </addon>
 
-<addon id="plugin.video.lemonade" name="Lemonade" version="5.5" provider-name="Lemonade">
+<addon id="plugin.video.lemonade" name="Lemonade" version="5.6" provider-name="Lemonade">
   <requires>
     <import addon="xbmc.python" version="3.0.0" />
     <import addon="script.module.requests" />
