@@ -441,7 +441,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="repository.bangvnine" name="Bang" version="9.1" provider-name="Bang">
+<addon id="repository.bangvnine" name="Bang" version="9.2" provider-name="Bang">
 	<extension point="xbmc.addon.repository" name="Bang">
 		<dir>
 			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/addons.xml</info>
