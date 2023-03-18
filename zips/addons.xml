@@ -475,6 +475,31 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
+<addon id="repository.dontpanic" name="Don't Panic" version="0.2.4" provider-name="pannal">
+    <extension point="xbmc.addon.repository" name="Don't Panic Kodi Repo">
+        <dir minversion="19.0.0" maxversion="19.9.9">
+            <info compressed="false">https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/</datadir>
+        </dir>
+        <dir minversion="20.0.0">
+            <info compressed="false">https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/</datadir>
+        </dir>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary>dontpanic</summary>
+        <description>Randomly reasonably stable hacked/improved/altered addons</description>
+        <disclaimer></disclaimer>
+        <platform>all</platform>
+        <assets>
+            <icon>icon.png</icon>
+            <fanart>fanart.jpg</fanart>
+        </assets>
+    </extension>
+</addon>
+
 <addon id="repository.Palantir" name="[COLOR gold]Palantir[/COLOR] Repo" version="1.0.1" provider-name="TierraMedia">
     <extension point="xbmc.addon.repository" name="Palantir Repo">
         <info>https://raw.githubusercontent.com/Palantiraddon/Repo/master/Palantir/addons.xml</info>
