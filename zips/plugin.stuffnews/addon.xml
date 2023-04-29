@@ -1,0 +1,12 @@
+<addon id="plugin.stuffnews" version="1.0.0" name="Stuff News">
+    <extension point="xbmc.python.script" library="default.py">
+        <provides>video</provides>
+    </extension>
+    <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+    <import addon="script.module.requests"/>
+    <import addon="script.module.beautifulsoup4"/>
+    </requires>
+    <summary>Read the latest news from Stuff.co.nz</summary>
+    <description>Get the latest news, sport, and entertainment updates from Stuff.co.nz, one of New Zealand's leading news websites.</description>
+</addon>
