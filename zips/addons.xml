@@ -513,6 +513,19 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
+<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzau" name="Skin Backgrounds NZ AUS" version="5.4" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack NZ Ausralia build</summary>
+		<description lang="en">Skin Backgrounds Pack NZ Australia Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
 <addon id="script.module.beautifulsoup4" name="BeautifulSoup4" version="4.9.3+matrix.1" provider-name="Leonard Richardson (leonardr@segfault.org)">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
