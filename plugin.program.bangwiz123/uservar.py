@@ -10,7 +10,7 @@ ADDONTITLE     = 'Bang Wizard'
 BUILDERNAME    = 'Bang Wizard'
 #########################Make sure to change the repo to yours!!!!
 EXCLUDES       = [ADDON_ID, 'roms', 'My_Builds', 'backupdir', 'script.module.kodi-six', 'script.module.six', 'repository.bangvnine', 'plugin.program.bangwiz123']
-BUILDFILE      = 'https://github.com/hidemyassbaby/wizland/raw/main/wizard/buildurls/4.6.txt'
+BUILDFILE      = 'https://raw.githubusercontent.com/hidemyassbaby/wizland/main/wizard/buildurls/05405buildmenu5521566/builds%20urls/01325123145145344524464r6f/24518525695095905460/254025185485125485487update/5405415810505966200/3254025125058151851505021/5.0.txt'
 UPDATECHECK    = 0
 APKFILE        = 'http://'
 YOUTUBETITLE   = 'FTG Help Videos' 
