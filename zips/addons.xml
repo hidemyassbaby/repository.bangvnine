@@ -500,6 +500,19 @@ In addition to what livestreams allowed you to do, you can now,
     </extension>
 </addon>
 
+<addon id="resource.images.nztouchbackground" name="Skin Backgrounds NZ Touch" version="1.0" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack NZ Touch Build</summary>
+		<description lang="en">Skin Backgrounds Pack NZ Touch Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
 <addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="4.3" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
