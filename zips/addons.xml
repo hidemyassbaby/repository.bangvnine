@@ -407,6 +407,35 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
+<addon id="plugin.video.zoechip" name="Zoe Chip" version="1.0" provider-name="Bang">    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+        <import addon="script.module.requests" />
+        <import addon="script.module.inputstreamhelper" />
+        <import addon="script.module.six"/>
+        <import addon="script.module.beautifulsoup4" />
+    </requires>
+    <extension point="xbmc.python.pluginsource" library="addon.py">
+        <provides>video</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <description lang="pl">1.2</description>
+        <disclaimer lang="pl">test
+        </disclaimer>
+        <summary lang="en">Movie & TV Shows</summary>
+        <description lang="en">Addon is in Beta! - Zoechip is a Free Movies streaming site with zero ads. We let you watch movies online without having to register or paying, with over 10000 movies and TV-Series</description>
+        <disclaimer lang="en">Zoechip does not store any files on our server, we only linked to the media which is hosted on 3rd party services.
+        </disclaimer>
+        <language>pl</language>
+        <platform>all</platform>
+        <license>GNU GENERAL PUBLIC LICENSE. Version 2, June 1991</license>
+        <website></website>
+        <assets>
+            <icon>icon.png</icon>
+            <fanart>fanart.jpg</fanart>
+        </assets>
+    </extension>
+</addon>
+
 <addon id="repository.bangbuilds" name="Bang Builds" version="1.2" provider-name="Bang">
 	<extension point="xbmc.addon.repository" name="Bang">
 		<dir>
