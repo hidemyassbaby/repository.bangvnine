@@ -283,7 +283,7 @@ v2.3.14 (2019-02-10)
   </extension>
 </addon>
 
-<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="5.0" provider-name="Bang">
+<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="6.0" provider-name="Bang">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
     <import addon="script.module.six" />
@@ -566,24 +566,6 @@ In addition to what livestreams allowed you to do, you can now,
 		<description lang="en">Skin Backgrounds Pack NZ Australia Build</description>
 		<platform>all</platform>
 	</extension>
-</addon>
-
-<!-- addon.xml -->
-
-<addon id="script.lottoresults" version="1.0.0" name="Lotto Results" provider-name="Bang">
-    <requires>
-        <import addon="xbmc.python" version="2.25.0"/>
-    </requires>
-    <extension point="xbmc.python.script" library="resources/lib/lotto_results.py">
-        <provides>script</provides>
-    </extension>
-    <extension point="xbmc.addon.metadata">
-        <platform>all</platform>
-        <summary>Display the latest Lotto NZ results</summary>
-        <description>Lotto Results addon retrieves and displays the latest Lotto NZ Results</description>
-        <icon>icon.png</icon>
-        <language>en</language>
-    </extension>
 </addon>
 
 <addon id="script.module.beautifulsoup4" name="BeautifulSoup4" version="4.9.3+matrix.1" provider-name="Leonard Richardson (leonardr@segfault.org)">
