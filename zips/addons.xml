@@ -568,6 +568,19 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
+<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.0" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack - Wayne Build</summary>
+		<description lang="en">Skin Backgrounds - Wayne Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
 <addon id="script.module.beautifulsoup4" name="BeautifulSoup4" version="4.9.3+matrix.1" provider-name="Leonard Richardson (leonardr@segfault.org)">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
