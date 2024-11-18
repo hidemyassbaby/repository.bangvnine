@@ -542,7 +542,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="4.6" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="5.0" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
