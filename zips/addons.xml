@@ -407,8 +407,12 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="1.0.0" provider-name="YourName">
-    <extension point="xbmc.python.plugin" library="default.py" />
+<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="2.0" provider-name="YourName" extension="true">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+    </requires>
+
+    <extension point="xbmc.python.script"/>
     <extension point="xbmc.addon.metadata">
         <summary>Xtream Codes IPTV for Kodi</summary>
         <description>Allows users to connect to Xtream Codes IPTV using a server URL, username, and password.</description>
