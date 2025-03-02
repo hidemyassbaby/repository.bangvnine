@@ -407,13 +407,12 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="7.0" provider-name="YourName">
+<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="9.0" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests"/>
     </requires>
 
-    <!-- Correct Extension for Video Add-ons -->
     <extension point="xbmc.python.pluginsource" library="default.py">
         <provides>video</provides>
     </extension>

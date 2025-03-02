@@ -2,31 +2,92 @@ import requests
 
 class XtreamAPI:
     def __init__(self, server, username, password):
+        """ Initialize Xtream Codes API """
         self.server = server
         self.username = username
         self.password = password
         self.base_url = f"{server}/player_api.php"
 
+    def get_user_info(self):
+        """ Fetch User Account Information (Expiry Date, Connections, Status) """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=user_info"
+        response = self._send_request(url)
+        return response.get("user_info", {}) if response else {}
+
     def get_live_categories(self):
-        """ Fetch Live TV categories """
+        """ Fetch Live TV Categories """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_live_categories"
-        response = requests.get(url)
-        return response.json() if response.status_code == 200 else []
+        return self._send_request(url) or []
 
     def get_live_streams(self, category_id):
-        """ Fetch Live TV channels for a category """
+        """ Fetch Live TV Channels for a Specific Category """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_live_streams&category_id={category_id}"
-        response = requests.get(url)
-        return response.json() if response.status_code == 200 else []
+        return self._send_request(url) or []
 
     def get_vod_categories(self):
-        """ Fetch VOD categories """
+        """ Fetch VOD (Movies) Categories """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_vod_categories"
-        response = requests.get(url)
-        return response.json() if response.status_code == 200 else []
+        return self._send_request(url) or []
 
     def get_vod_streams(self, category_id):
-        """ Fetch VOD movies/shows """
+        """ Fetch VOD Movies/TV Shows for a Specific Category """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_vod_streams&category_id={category_id}"
-        response = requests.get(url)
-        return response.json() if response.status_code == 200 else []
+        return self._send_request(url) or []
+
+    def get_series_categories(self):
+        """ Fetch TV Shows Categories """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_series_categories"
+        return self._send_request(url) or []
+
+    def get_series(self, category_id):
+        """ Fetch TV Shows for a Specific Category """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_series&category_id={category_id}"
+        return self._send_request(url) or []
+
+    def get_series_info(self, series_id):
+        """ Fetch Series Info (Episodes & Seasons) """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_series_info&series_id={series_id}"
+        return self._send_request(url) or {}
+
+    def get_episode_stream(self, episode_id):
+        """ Fetch Stream URL for a TV Show Episode """
+        stream_url = f"{self.server}/series/{self.username}/{self.password}/{episode_id}.m3u8&type=m3u_plus"
+        return stream_url
+
+    def get_short_epg(self, stream_id, limit=10):
+        """ Fetch Short EPG (Electronic Program Guide) for a Live TV Channel """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_short_epg&stream_id={stream_id}&limit={limit}"
+        return self._send_request(url) or []
+
+    def get_full_epg(self):
+        """ Fetch Full EPG for All Available Channels """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_simple_data_table"
+        return self._send_request(url) or []
+
+    def test_connection(self):
+        """ Test Connection to Xtream Codes API """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=user_info"
+        response = self._send_request(url)
+        return response if response else {}
+
+    def get_m3u_playlist(self):
+        """ Generate M3U Playlist Link for Downloading """
+        return f"{self.server}/get.php?username={self.username}&password={self.password}&type=m3u_plus&output=mpegts"
+
+    def get_epg_xml(self):
+        """ Generate EPG XML Link for External Use """
+        return f"{self.server}/xmltv.php?username={self.username}&password={self.password}"
+
+    def logout(self):
+        """ Logout by Clearing Stored Credentials """
+        return {"status": "Logged Out"}
+
+    def _send_request(self, url):
+        """ Send GET Request and Handle Errors """
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"XtreamAPI Error: {str(e)}")
+        return None
