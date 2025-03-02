@@ -5,8 +5,7 @@ import xbmcplugin
 from resources.lib.xtream import XtreamAPI
 
 ADDON = xbmcaddon.Addon()
-ADDON_ID = ADDON.getAddonInfo('id')
-BASE_URL = "plugin://" + ADDON_ID
+BASE_URL = "plugin://" + ADDON.getAddonInfo('id')
 
 def get_settings():
     server = ADDON.getSetting("server_url")
@@ -29,23 +28,26 @@ def prompt_settings():
         ADDON.setSetting("username", username)
         ADDON.setSetting("password", password)
 
-def main_menu():
+def build_menu():
     settings = get_settings()
     if not settings:
         return
 
-    url = settings['server']
-    user = settings['username']
-    passwd = settings['password']
+    api = XtreamAPI(settings["server"], settings["username"], settings["password"])
+    
+    categories = [
+        ("Live TV", "live"),
+        ("Movies (VOD)", "movies"),
+        ("TV Shows", "series"),
+        ("EPG", "epg")
+    ]
 
-    api = XtreamAPI(url, user, passwd)
-    categories = api.get_live_categories()
-
-    for category in categories:
-        list_item = xbmcgui.ListItem(label=category['name'])
-        xbmcplugin.addDirectoryItem(handle=xbmcplugin.getCurrentHandle(), url=BASE_URL, listitem=list_item, isFolder=True)
+    for name, mode in categories:
+        url = f"{BASE_URL}?mode={mode}"
+        list_item = xbmcgui.ListItem(label=name)
+        xbmcplugin.addDirectoryItem(handle=xbmcplugin.getCurrentHandle(), url=url, listitem=list_item, isFolder=True)
 
     xbmcplugin.endOfDirectory(xbmcplugin.getCurrentHandle())
 
 if __name__ == '__main__':
-    main_menu()
+    build_menu()
