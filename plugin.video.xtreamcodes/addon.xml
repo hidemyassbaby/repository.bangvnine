@@ -1,16 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addons>
-    <addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="6.0" provider-name="Bang">
-        <requires>
-            <import addon="xbmc.python" version="3.0.0"/>
-        </requires>
-        <extension point="xbmc.python.plugin" library="default.py"/>
-        <extension point="xbmc.addon.metadata">
-            <summary lang="en">Xtream Codes IPTV for Kodi</summary>
-            <description lang="en">Watch Live TV, Movies, and TV Shows from your Xtream Codes server.</description>
-            <platform>all</platform>
-            <category>video</category>
-            <disclaimer>This add-on does not host any content.</disclaimer>
-        </extension>
-    </addon>
-</addons>
+<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="7.0" provider-name="YourName">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+        <import addon="script.module.requests"/>
+    </requires>
+
+    <!-- Correct Extension for Video Add-ons -->
+    <extension point="xbmc.python.pluginsource" library="default.py">
+        <provides>video</provides>
+    </extension>
+
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en_GB">Xtream Codes IPTV for Kodi</summary>
+        <description lang="en_GB">Watch Live TV, Movies, and TV Shows from your Xtream Codes server.</description>
+        <platform>all</platform>
+        <language>en_GB</language>
+        <license>GPL-2.0-or-later</license>
+        <disclaimer>This add-on does not host any content.</disclaimer>
+        <assets>
+            <icon>icon.png</icon>
+            <fanart>fanart.jpg</fanart>
+        </assets>
+    </extension>
+</addon>
