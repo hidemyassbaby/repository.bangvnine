@@ -37,8 +37,13 @@ def build_main_menu():
         xbmcplugin.endOfDirectory(ADDON_HANDLE)
         return
 
+    # Validate login before showing categories
     api = XtreamAPI(settings["server"], settings["username"], settings["password"])
-    
+    if not api.test_connection():
+        xbmcgui.Dialog().ok("Error", "Invalid login credentials. Please check your settings.")
+        open_settings()
+        return
+
     # Categories
     categories = [
         ("Account Info", "account_info"),
@@ -65,55 +70,18 @@ def build_main_menu():
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
-def show_account_info():
-    """ Display full account information inside a folder """
-    settings = get_settings()
-    if not settings:
-        return
+def open_settings():
+    """ Open the Kodi Plugin Settings and refresh UI """
+    ADDON.openSettings()
+    xbmc.executebuiltin("Container.Refresh")
 
-    api = XtreamAPI(settings["server"], settings["username"], settings["password"])
-    user_info = api.get_user_info()
-
-    if not user_info:
-        xbmcgui.Dialog().ok("Error", "Could not fetch account info. Please check your login details.")
-        logout()
-        return
-
-    details = {
-        "Status": user_info.get("status", "Unknown"),
-        "Expiry Date": user_info.get("expiry_date", "Unknown"),
-        "Active Connections": user_info.get("active_cons", "0"),
-        "Max Connections": user_info.get("max_cons", "0"),
-        "Is Trial": "Yes" if user_info.get("is_trial", "0") == "1" else "No",
-        "Created At": user_info.get("created_at", "Unknown"),
-        "Allowed Output Formats": user_info.get("allowed_output_formats", "N/A"),
-    }
-
-    for key, value in details.items():
-        list_item = xbmcgui.ListItem(label=f"{key}: {value}")
-        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url="", listitem=list_item, isFolder=False)
-
-    xbmcplugin.endOfDirectory(ADDON_HANDLE)
-
-def show_live_tv():
-    """ Display Live TV categories """
-    settings = get_settings()
-    if not settings:
-        return
-
-    api = XtreamAPI(settings["server"], settings["username"], settings["password"])
-    categories = api.get_live_categories()
-
-    if not categories:
-        xbmcgui.Dialog().ok("Error", "No live TV categories found.")
-        return
-
-    for category in categories:
-        url = f"{BASE_URL}?mode=live_channels&category_id={category['category_id']}"
-        list_item = xbmcgui.ListItem(label=category["category_name"])
-        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
-
-    xbmcplugin.endOfDirectory(ADDON_HANDLE)
+def logout():
+    """ Logout and Reset Credentials """
+    ADDON.setSetting("server_url", "")
+    ADDON.setSetting("username", "")
+    ADDON.setSetting("password", "")
+    xbmcgui.Dialog().ok("Xtream Codes IPTV", "You have been logged out.")
+    xbmc.executebuiltin("Container.Refresh")
 
 def router():
     """ Handle navigation """
@@ -122,10 +90,8 @@ def router():
 
     if mode is None:
         build_main_menu()
-    elif mode == "account_info":
-        show_account_info()
-    elif mode == "live":
-        show_live_tv()
+    elif mode == "login":
+        open_settings()
     elif mode == "settings":
         open_settings()
     elif mode == "logout":

@@ -8,6 +8,14 @@ class XtreamAPI:
         self.password = password
         self.base_url = f"{server}/player_api.php"
 
+    def test_connection(self):
+        """ Test Connection to Xtream Codes API (Ensures login works) """
+        url = f"{self.base_url}?username={self.username}&password={self.password}&action=user_info"
+        response = self._send_request(url)
+        if response and "user_info" in response:
+            return True  # Login successful
+        return False  # Login failed
+
     def get_user_info(self):
         """ Fetch User Account Information """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=user_info"
@@ -36,62 +44,6 @@ class XtreamAPI:
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_live_streams&category_id={category_id}"
         response = self._send_request(url)
         return response if response else []
-
-    def get_vod_categories(self):
-        """ Fetch VOD (Movies) Categories """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_vod_categories"
-        response = self._send_request(url)
-        return response if response else []
-
-    def get_vod_streams(self, category_id):
-        """ Fetch VOD Movies/TV Shows for a Specific Category """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_vod_streams&category_id={category_id}"
-        response = self._send_request(url)
-        return response if response else []
-
-    def get_series_categories(self):
-        """ Fetch TV Shows Categories """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_series_categories"
-        response = self._send_request(url)
-        return response if response else []
-
-    def get_series(self, category_id):
-        """ Fetch TV Shows for a Specific Category """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_series&category_id={category_id}"
-        response = self._send_request(url)
-        return response if response else []
-
-    def get_series_info(self, series_id):
-        """ Fetch Series Info (Episodes & Seasons) """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_series_info&series_id={series_id}"
-        response = self._send_request(url)
-        return response if response else {}
-
-    def get_episode_stream(self, episode_id):
-        """ Fetch Stream URL for a TV Show Episode """
-        return f"{self.server}/series/{self.username}/{self.password}/{episode_id}.m3u8"
-
-    def get_short_epg(self, stream_id, limit=10):
-        """ Fetch Short EPG (Electronic Program Guide) for a Live TV Channel """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_short_epg&stream_id={stream_id}&limit={limit}"
-        response = self._send_request(url)
-        return response if response else []
-
-    def get_full_epg(self):
-        """ Fetch Full EPG for All Available Channels """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_simple_data_table"
-        response = self._send_request(url)
-        return response if response else []
-
-    def test_connection(self):
-        """ Test Connection to Xtream Codes API """
-        url = f"{self.base_url}?username={self.username}&password={self.password}&action=user_info"
-        response = self._send_request(url)
-        return response if response else {}
-
-    def logout(self):
-        """ Logout by Clearing Stored Credentials """
-        return {"status": "Logged Out"}
 
     def _send_request(self, url):
         """ Send GET Request and Handle Errors """
