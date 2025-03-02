@@ -48,9 +48,8 @@ def build_main_menu():
     ]
 
     for name, mode in categories:
-        url = f"{BASE_URL}?mode={mode}"
-        list_item = xbmcgui.ListItem(label=name)  # Removed emojis
-        list_item.setArt({"icon": "DefaultVideo.png"})
+        url = f"{BASE_URL}?mode={urllib.parse.quote(mode)}"
+        list_item = xbmcgui.ListItem(label=name)
         list_item.setInfo("video", {"title": name})
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
 
@@ -96,18 +95,25 @@ def show_account_info():
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
-def open_settings():
-    """ Open the Kodi Plugin Settings """
-    ADDON.openSettings()
-    xbmc.executebuiltin("Container.Refresh")  # Refresh UI after login
+def show_live_tv():
+    """ Display Live TV categories """
+    settings = get_settings()
+    if not settings:
+        return
 
-def logout():
-    """ Logout and Reset Credentials """
-    ADDON.setSetting("server_url", "")
-    ADDON.setSetting("username", "")
-    ADDON.setSetting("password", "")
-    xbmcgui.Dialog().ok("Xtream Codes IPTV", "You have been logged out.")
-    xbmc.executebuiltin("Container.Refresh")
+    api = XtreamAPI(settings["server"], settings["username"], settings["password"])
+    categories = api.get_live_categories()
+
+    if not categories:
+        xbmcgui.Dialog().ok("Error", "No live TV categories found.")
+        return
+
+    for category in categories:
+        url = f"{BASE_URL}?mode=live_channels&category_id={category['category_id']}"
+        list_item = xbmcgui.ListItem(label=category["category_name"])
+        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
+
+    xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 def router():
     """ Handle navigation """
@@ -116,10 +122,10 @@ def router():
 
     if mode is None:
         build_main_menu()
-    elif mode == "login":
-        open_settings()
     elif mode == "account_info":
         show_account_info()
+    elif mode == "live":
+        show_live_tv()
     elif mode == "settings":
         open_settings()
     elif mode == "logout":
