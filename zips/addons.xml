@@ -407,14 +407,11 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="2.0.1" provider-name="Bang">
-    <requires>
-        <import addon="xbmc.python" version="3.0.0"/>
-    </requires>
-    <extension point="xbmc.python.pluginsource" library="addon.py" />
+<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="1.0.0" provider-name="YourName">
+    <extension point="xbmc.python.plugin" library="default.py" />
     <extension point="xbmc.addon.metadata">
-        <summary lang="en">Xtream Codes IPTV Addon</summary>
-        <description lang="en">A Kodi addon to stream IPTV via Xtream Codes.</description>
+        <summary>Xtream Codes IPTV for Kodi</summary>
+        <description>Allows users to connect to Xtream Codes IPTV using a server URL, username, and password.</description>
         <platform>all</platform>
     </extension>
 </addon>
@@ -554,7 +551,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="5.0" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.0" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
