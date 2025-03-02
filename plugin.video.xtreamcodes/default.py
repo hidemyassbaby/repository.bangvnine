@@ -32,7 +32,7 @@ def build_main_menu():
     if not settings:
         # Show Login Button Only
         url = f"{BASE_URL}?mode=login"
-        list_item = xbmcgui.ListItem(label="🔑 Login")
+        list_item = xbmcgui.ListItem(label="Login")
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
         xbmcplugin.endOfDirectory(ADDON_HANDLE)
         return
@@ -41,33 +41,33 @@ def build_main_menu():
     
     # Categories
     categories = [
-        ("📜 Account Info", "account_info"),
-        ("📺 Live TV", "live"),
-        ("🎬 Movies (VOD)", "movies"),
-        ("📀 TV Shows", "series")
+        ("Account Info", "account_info"),
+        ("Live TV", "live"),
+        ("Movies (VOD)", "movies"),
+        ("TV Shows", "series")
     ]
 
     for name, mode in categories:
         url = f"{BASE_URL}?mode={mode}"
-        list_item = xbmcgui.ListItem(label=name.encode("utf-8").decode("utf-8"))  # Fixes encoding issue
+        list_item = xbmcgui.ListItem(label=name)  # Removed emojis
         list_item.setArt({"icon": "DefaultVideo.png"})
         list_item.setInfo("video", {"title": name})
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
 
     # Settings Button
     url = f"{BASE_URL}?mode=settings"
-    list_item = xbmcgui.ListItem(label="🔧 Settings")
+    list_item = xbmcgui.ListItem(label="Settings")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
     # Logout Button
     url = f"{BASE_URL}?mode=logout"
-    list_item = xbmcgui.ListItem(label="🚪 Logout")
+    list_item = xbmcgui.ListItem(label="Logout")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 def show_account_info():
-    """ Display full account information in a folder structure """
+    """ Display full account information inside a folder """
     settings = get_settings()
     if not settings:
         return
@@ -82,9 +82,9 @@ def show_account_info():
 
     details = {
         "Status": user_info.get("status", "Unknown"),
-        "Expiry Date": user_info.get("exp_date", "Unknown"),
+        "Expiry Date": user_info.get("expiry_date", "Unknown"),
         "Active Connections": user_info.get("active_cons", "0"),
-        "Max Connections": user_info.get("max_connections", "0"),
+        "Max Connections": user_info.get("max_cons", "0"),
         "Is Trial": "Yes" if user_info.get("is_trial", "0") == "1" else "No",
         "Created At": user_info.get("created_at", "Unknown"),
         "Allowed Output Formats": user_info.get("allowed_output_formats", "N/A"),

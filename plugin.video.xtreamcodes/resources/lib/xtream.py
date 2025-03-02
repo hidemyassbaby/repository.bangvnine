@@ -62,7 +62,7 @@ class XtreamAPI:
 
     def get_episode_stream(self, episode_id):
         """ Fetch Stream URL for a TV Show Episode """
-        return f"{self.server}/series/{self.username}/{self.password}/{episode_id}.m3u8&type=m3u_plus"
+        return f"{self.server}/series/{self.username}/{self.password}/{episode_id}.m3u8"
 
     def get_short_epg(self, stream_id, limit=10):
         """ Fetch Short EPG (Electronic Program Guide) for a Live TV Channel """
@@ -79,14 +79,6 @@ class XtreamAPI:
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=user_info"
         response = self._send_request(url)
         return response if response else {}
-
-    def get_m3u_playlist(self):
-        """ Generate M3U Playlist Link for Downloading """
-        return f"{self.server}/get.php?username={self.username}&password={self.password}&type=m3u_plus&output=mpegts"
-
-    def get_epg_xml(self):
-        """ Generate EPG XML Link for External Use """
-        return f"{self.server}/xmltv.php?username={self.username}&password={self.password}"
 
     def logout(self):
         """ Logout by Clearing Stored Credentials """
