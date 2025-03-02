@@ -28,7 +28,7 @@ def get_settings():
     return {"server": server, "username": username, "password": password}
 
 def build_main_menu():
-    """ Main Menu """
+    """ Main Menu - Categories for Video Addon """
     categories = [
         ("Live TV", "live"),
         ("Movies (VOD)", "movies"),
@@ -38,6 +38,8 @@ def build_main_menu():
     for name, mode in categories:
         url = f"{BASE_URL}?mode={mode}"
         list_item = xbmcgui.ListItem(label=name)
+        list_item.setArt({"icon": "DefaultVideo.png"})
+        list_item.setInfo("video", {"title": name})
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
@@ -54,6 +56,7 @@ def list_live_tv():
     for category in categories:
         url = f"{BASE_URL}?mode=live_channels&category_id={category['category_id']}"
         list_item = xbmcgui.ListItem(label=category['category_name'])
+        list_item.setInfo("video", {"title": category["category_name"]})
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
@@ -68,8 +71,12 @@ def list_live_channels(category_id):
     channels = api.get_live_streams(category_id)
 
     for channel in channels:
-        url = f"{BASE_URL}?mode=play&url={urllib.parse.quote(channel['stream_url'])}"
+        stream_url = f"{settings['server']}/live/{settings['username']}/{settings['password']}/{channel['stream_id']}.m3u8"
+        url = f"{BASE_URL}?mode=play&url={urllib.parse.quote(stream_url)}"
         list_item = xbmcgui.ListItem(label=channel['name'])
+        list_item.setArt({"icon": "DefaultVideo.png"})
+        list_item.setProperty("IsPlayable", "true")
+        list_item.setInfo("video", {"title": channel["name"]})
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
@@ -77,7 +84,8 @@ def list_live_channels(category_id):
 def play_stream(stream_url):
     """ Play IPTV stream """
     list_item = xbmcgui.ListItem(path=stream_url)
-    xbmc.Player().play(stream_url, list_item)
+    list_item.setProperty("IsPlayable", "true")
+    xbmcplugin.setResolvedUrl(ADDON_HANDLE, True, list_item)
 
 def router():
     """ Handle navigation """

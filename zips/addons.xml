@@ -407,18 +407,19 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="4.0" provider-name="Bang">
+<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="5.0" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
 
+    <!-- THIS DECLARES IT AS A VIDEO ADDON -->
     <extension point="xbmc.python.plugin" library="default.py"/>
 
     <extension point="xbmc.addon.metadata">
         <summary>Xtream Codes IPTV for Kodi</summary>
         <description>Watch Live TV, Movies, and TV Shows from your Xtream Codes server.</description>
         <platform>all</platform>
-        <category>Video</category>
+        <category>video</category>
     </extension>
 </addon>
 
