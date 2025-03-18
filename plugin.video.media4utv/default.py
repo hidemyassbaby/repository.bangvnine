@@ -9,7 +9,7 @@ from urllib.parse import parse_qsl
 # Import API
 addon_path = os.path.dirname(__file__)
 sys.path.append(addon_path)
-from xtream_api import XtreamAPI
+from resources.lib.xtream_api import XtreamAPI
 
 ADDON_HANDLE = int(sys.argv[1])
 BASE_URL = "plugin://plugin.video.media4utv"
