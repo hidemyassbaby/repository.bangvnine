@@ -1,44 +1,39 @@
-import xbmc
-import xbmcaddon
-import time
 import sys
 import os
+import xbmc
+import xbmcaddon
+import xbmcvfs
+import time
 
-# Ensure correct module paths
-sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+# Ensure the `lib` folder is added to Python's path
+ADDON_PATH = xbmcvfs.translatePath(xbmcaddon.Addon().getAddonInfo("path"))
+LIB_PATH = os.path.join(ADDON_PATH, "resources", "lib")
+sys.path.append(LIB_PATH)
 
-from xtream_api import XtreamAPI  # ✅ Corrected import
-from cache import CacheManager  # ✅ Corrected import
+from xtream_api import XtreamAPI
+from cache import CacheManager
 
 # Initialize Add-on
 ADDON = xbmcaddon.Addon()
-BASE_URL = "http://m3ufilter.media4u.top/player_api.php"
 USERNAME = ADDON.getSetting("username")
 PASSWORD = ADDON.getSetting("password")
+SERVER_URL = "http://m3ufilter.media4u.top"
+BASE_URL = f"{SERVER_URL}/player_api.php"
 
-# ✅ Ensure XtreamAPI is initialized with the correct parameters
-API = XtreamAPI(BASE_URL, USERNAME, PASSWORD)  # ✅ Fixed
-
-# Initialize Cache
+# Initialize API and Cache
+API = XtreamAPI(BASE_URL, USERNAME, PASSWORD)
 CACHE = CacheManager()
 
-def update_cache():
-    """Update cache with new data."""
-    try:
-        live_categories = API.get_live_categories()
-        CACHE.set_cache("categories", live_categories)
-        xbmc.log("[Media4u TV] Cache updated successfully.", xbmc.LOGINFO)
-    except Exception as e:
-        xbmc.log(f"[Media4u TV] Cache update failed: {e}", xbmc.LOGERROR)
+# Background process to refresh cache every hour
+while not xbmc.Monitor().abortRequested():
+    categories = API.get_live_categories()
+    if categories:
+        CACHE.set_cache("categories", categories)
 
-# First-time cache update
-update_cache()
+        for category in categories:
+            category_id = category["category_id"]
+            streams = API.get_live_streams(category_id)
+            if streams:
+                CACHE.set_cache(f"streams_{category_id}", streams)
 
-# ✅ Monitor Kodi shutdown
-monitor = xbmc.Monitor()
-
-# ✅ Background process to refresh cache every hour
-while not monitor.abortRequested():
-    update_cache()
-    if monitor.waitForAbort(3600):  # Wait for 1 hour but exit if Kodi shuts down
-        break
+    xbmc.sleep(3600000)  # Refresh every 1 hour
