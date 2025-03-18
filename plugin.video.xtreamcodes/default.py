@@ -17,20 +17,18 @@ def get_params():
 
 def get_settings():
     """ Get user credentials and validate them """
-    server = ADDON.getSetting("server_url").strip()
     username = ADDON.getSetting("username").strip()
     password = ADDON.getSetting("password").strip()
 
-    if not server or not username or not password:
+    if not username or not password:
         return None
-    return {"server": server, "username": username, "password": password}
+    return {"username": username, "password": password}
 
 def build_main_menu():
     """ Main Menu - Show Login if Not Logged In, Otherwise Show Categories """
     settings = get_settings()
 
     if not settings:
-        # Show Login Button Only
         url = f"{BASE_URL}?mode=login"
         list_item = xbmcgui.ListItem(label="Login")
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
@@ -38,13 +36,12 @@ def build_main_menu():
         return
 
     # Validate login before showing categories
-    api = XtreamAPI(settings["server"], settings["username"], settings["password"])
+    api = XtreamAPI(settings["username"], settings["password"])
     if not api.test_connection():
-        xbmcgui.Dialog().ok("Error", "Invalid login credentials. Please check your settings.")
+        xbmcgui.Dialog().ok("Error", "Invalid credentials or server is unreachable. Please check your settings.")
         open_settings()
         return
 
-    # Categories
     categories = [
         ("Account Info", "account_info"),
         ("Live TV", "live"),
@@ -55,15 +52,12 @@ def build_main_menu():
     for name, mode in categories:
         url = f"{BASE_URL}?mode={urllib.parse.quote(mode)}"
         list_item = xbmcgui.ListItem(label=name)
-        list_item.setInfo("video", {"title": name})
         xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
 
-    # Settings Button
     url = f"{BASE_URL}?mode=settings"
     list_item = xbmcgui.ListItem(label="Settings")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
-    # Logout Button
     url = f"{BASE_URL}?mode=logout"
     list_item = xbmcgui.ListItem(label="Logout")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
@@ -77,7 +71,6 @@ def open_settings():
 
 def logout():
     """ Logout and Reset Credentials """
-    ADDON.setSetting("server_url", "")
     ADDON.setSetting("username", "")
     ADDON.setSetting("password", "")
     xbmcgui.Dialog().ok("Xtream Codes IPTV", "You have been logged out.")

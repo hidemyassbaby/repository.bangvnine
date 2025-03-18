@@ -1,20 +1,21 @@
 import requests
 
 class XtreamAPI:
-    def __init__(self, server, username, password):
-        """ Initialize Xtream Codes API """
-        self.server = server
+    def __init__(self, username, password):
+        """ Initialize Xtream Codes API with Custom API URL """
         self.username = username
         self.password = password
-        self.base_url = f"{server}/player_api.php"
+        self.base_url = f"https://m3ufilter.media4u.top/player_api.php"
 
     def test_connection(self):
-        """ Test Connection to Xtream Codes API (Ensures login works) """
+        """ Test Connection to Xtream Codes API """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=user_info"
         response = self._send_request(url)
         if response and "user_info" in response:
+            print("✅ Login successful!")
             return True  # Login successful
-        return False  # Login failed
+        print("❌ Login failed: Invalid credentials or server issue.")
+        return False
 
     def get_user_info(self):
         """ Fetch User Account Information """
@@ -36,21 +37,23 @@ class XtreamAPI:
     def get_live_categories(self):
         """ Fetch Live TV Categories """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_live_categories"
-        response = self._send_request(url)
-        return response if response else []
+        return self._send_request(url) or []
 
     def get_live_streams(self, category_id):
         """ Fetch Live TV Channels for a Specific Category """
         url = f"{self.base_url}?username={self.username}&password={self.password}&action=get_live_streams&category_id={category_id}"
-        response = self._send_request(url)
-        return response if response else []
+        return self._send_request(url) or []
 
     def _send_request(self, url):
         """ Send GET Request and Handle Errors """
+        print(f"🌐 Sending request: {url}")  # Debugging output
         try:
             response = requests.get(url, timeout=10)
-            if response.status_code == 200:
+            print(f"🔍 API Response: {response.text}")  # Debugging output
+            if response.status_code == 200 and response.text.strip():
                 return response.json()
+            else:
+                print(f"❌ Error: Received HTTP {response.status_code} or empty response.")
         except requests.exceptions.RequestException as e:
-            print(f"XtreamAPI Error: {str(e)}")
+            print(f"❌ XtreamAPI Error: {str(e)}")
         return None

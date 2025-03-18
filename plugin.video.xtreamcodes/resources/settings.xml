@@ -1,5 +1,6 @@
 <settings>
-    <setting id="server_url" type="text" label="Server URL" default="" />
-    <setting id="username" type="text" label="Username" default="" />
-    <setting id="password" type="text" label="Password" default="" option="hidden" />
+    <category label="Xtream Codes Login">
+        <setting id="username" type="text" label="Username" default="" />
+        <setting id="password" type="text" label="Password" option="hidden" default="" />
+    </category>
 </settings>
