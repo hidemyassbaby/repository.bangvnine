@@ -38,23 +38,23 @@ def build_main_menu():
 
     # Account Info
     url = f"{BASE_URL}?mode=account_info"
-    list_item = xbmcgui.ListItem(label="👤 Account Info")
+    list_item = xbmcgui.ListItem(label="Account Info")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
     # Live TV Section
     url = f"{BASE_URL}?mode=live"
-    list_item = xbmcgui.ListItem(label="📺 Live TV")
+    list_item = xbmcgui.ListItem(label="Live TV")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
 
     # Open Settings
     url = f"{BASE_URL}?mode=settings"
-    list_item = xbmcgui.ListItem(label="⚙️ Settings")
+    list_item = xbmcgui.ListItem(label="Settings")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 def show_live_categories():
-    """ Display Dynamic Live TV Categories """
+    """ Display Live TV Categories Dynamically """
     settings = get_settings()
     if not settings:
         return
@@ -74,7 +74,7 @@ def show_live_categories():
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 def show_live_streams(category_id):
-    """ Display Dynamic Live TV Streams """
+    """ Display Live TV Streams Dynamically """
     settings = get_settings()
     if not settings:
         return
@@ -105,16 +105,17 @@ def show_account_info():
     url = f"{api.base_url}?username={api.username}&password={api.password}&action=user_info"
     response = api._send_request(url)
 
-    if not response:
+    if not response or "user_info" not in response:
         xbmcgui.Dialog().ok("Error", "Failed to fetch account info.")
         return
 
-    info = f"👤 **Username:** {response.get('username', 'N/A')}\n" \
-           f"📅 **Expiry Date:** {response.get('exp_date', 'N/A')}\n" \
-           f"🟢 **Active Connections:** {response.get('active_cons', 'N/A')}\n" \
-           f"🔗 **Max Connections:** {response.get('max_connections', 'N/A')}\n"
+    user_info = response["user_info"]
+    info = f"Username: {user_info.get('username', 'N/A')}\n" \
+           f"Expiry Date: {user_info.get('exp_date', 'N/A')}\n" \
+           f"Active Connections: {user_info.get('active_cons', 'N/A')}\n" \
+           f"Max Connections: {user_info.get('max_connections', 'N/A')}\n"
 
-    xbmcgui.Dialog().ok("📊 Account Info", info)
+    xbmcgui.Dialog().ok("Account Info", info)
 
 def open_settings():
     """ Open the Kodi Plugin Settings and refresh UI """

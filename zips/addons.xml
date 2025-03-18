@@ -407,7 +407,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="11.2" provider-name="Bang">
+<addon id="plugin.video.media4utv" name="Media4u TV" version="1.0" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests"/>
@@ -418,8 +418,8 @@ In addition to what livestreams allowed you to do, you can now,
     </extension>
 
     <extension point="xbmc.addon.metadata">
-        <summary lang="en_GB">Xtream Codes IPTV for Kodi</summary>
-        <description lang="en_GB">Watch Live TV, Movies, and TV Shows from your Xtream Codes server.</description>
+        <summary lang="en_GB">Media4u TV for Kodi</summary>
+        <description lang="en_GB">Watch Live TV from Media4u</description>
         <platform>all</platform>
         <language>en_GB</language>
         <license>GPL-2.0-or-later</license>
