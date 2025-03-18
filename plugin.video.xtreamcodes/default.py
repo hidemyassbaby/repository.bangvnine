@@ -29,14 +29,11 @@ def build_main_menu():
     settings = get_settings()
 
     if not settings:
-        url = f"{BASE_URL}?mode=login"
-        list_item = xbmcgui.ListItem(label="Login")
-        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
-        xbmcplugin.endOfDirectory(ADDON_HANDLE)
+        xbmcgui.Dialog().ok("Xtream Codes IPTV", "Please enter your username and password in settings.")
+        open_settings()
         return
 
-    # Validate login before showing categories
-    api = XtreamAPI(settings["username"], settings["password"])
+    api = XtreamAPI()
     if not api.test_connection():
         xbmcgui.Dialog().ok("Error", "Invalid credentials or server is unreachable. Please check your settings.")
         open_settings()
