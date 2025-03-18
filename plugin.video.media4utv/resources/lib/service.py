@@ -34,7 +34,11 @@ def update_cache():
 # First-time cache update
 update_cache()
 
-# Background process to refresh cache every hour
-while not xbmc.abortRequested:
+# ✅ Monitor Kodi shutdown
+monitor = xbmc.Monitor()
+
+# ✅ Background process to refresh cache every hour
+while not monitor.abortRequested():
     update_cache()
-    xbmc.sleep(3600000)  # Refresh every 1 hour
+    if monitor.waitForAbort(3600):  # Wait for 1 hour but exit if Kodi shuts down
+        break
