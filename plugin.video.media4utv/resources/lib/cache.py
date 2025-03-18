@@ -1,60 +1,52 @@
 import os
 import json
 import time
-import xbmc
-import xbmcaddon
-from xbmcvfs import translatePath  # ✅ Use xbmcvfs for correct path handling
+import xbmcvfs
 
-# Get addon info
-ADDON = xbmcaddon.Addon()
-ADDON_ID = ADDON.getAddonInfo("id")
-
-# Set cache directory path
-CACHE_DIR = translatePath(f"special://profile/addon_data/{ADDON_ID}/cache")
+CACHE_EXPIRY = 3600  # Cache expires every 1 hour
+ADDON_ID = "plugin.video.media4utv"
+CACHE_DIR = xbmcvfs.translatePath(f"special://profile/addon_data/{ADDON_ID}/")
 CACHE_FILE = os.path.join(CACHE_DIR, "cache.json")
-CACHE_EXPIRY = 3600  # Cache expires after 1 hour (3600 seconds)
 
 class CacheManager:
+    """Handles caching of API data for faster loading."""
+    
     def __init__(self):
         """Ensure cache directory exists."""
         if not os.path.exists(CACHE_DIR):
             os.makedirs(CACHE_DIR)
 
-    def _load_cache(self):
-        """Load cache data from file."""
+    def load_cache(self):
+        """Load only cached data (ignores timestamp)."""
         if not os.path.exists(CACHE_FILE):
-            return {}
+            return None  # No cache found
 
         try:
             with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                cache_data = json.load(f)
-                return cache_data
+                cache = json.load(f)
+                return cache.get("data", None)  # Ensure only the stored data is returned
         except (json.JSONDecodeError, IOError):
-            return {}
+            return None  # Cache corrupt, return None
 
-    def _save_cache(self, cache_data):
-        """Save cache data to file."""
+    def save_cache(self, data):
+        """Save cache with timestamp."""
         try:
             with open(CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(cache_data, f, indent=4)
+                json.dump({"timestamp": time.time(), "data": data}, f, indent=4)
         except IOError:
-            pass
+            pass  # Failed to write cache
 
-    def get_cached_data(self, key):
-        """Retrieve cached data if it hasn't expired."""
-        cache_data = self._load_cache()
-        if key in cache_data:
-            entry = cache_data[key]
-            if time.time() - entry["timestamp"] < CACHE_EXPIRY:
-                return entry["data"]
-        
-        return None  # Cache expired or key not found
+    def is_cache_expired(self):
+        """Check if cache is expired or missing."""
+        if not os.path.exists(CACHE_FILE):
+            return True  # No cache, must update
 
-    def set_cache(self, key, data):
-        """Store data in cache with timestamp."""
-        cache_data = self._load_cache()
-        cache_data[key] = {"timestamp": time.time(), "data": data}
-        self._save_cache(cache_data)
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+                return time.time() - cache.get("timestamp", 0) > CACHE_EXPIRY
+        except (json.JSONDecodeError, IOError):
+            return True  # Cache corrupt, force update
 
     def clear_cache(self):
         """Clear all cached data."""

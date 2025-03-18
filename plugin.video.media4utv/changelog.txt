@@ -1,0 +1,27 @@
+v4.1.0 (19 March 2025)
+- Fixed issue where Live TV categories were showing timestamps & incorrect data.
+- Ensured streams play correctly when clicked.
+- Removed all emoji/weird characters from UI dialogs.
+- Updated UI text to say "Updating Data" instead of "Updating M3U".
+- Added a "Force Update" button in the main menu to manually refresh the channel list.
+- Improved caching system:
+  - Categories and streams now store properly.
+  - Cache updates in the background every hour.
+  - If cache is expired, a popup prompts users to update.
+  - Implemented a structured **M3U parser** to handle large lists efficiently.
+
+v4.0.0 (18 March 2025)
+- Added a background service to refresh M3U data every hour.
+- Implemented pagination for large category & stream lists.
+- Stream playback now properly resolves and plays in Kodi.
+
+v3.0.0 (17 March 2025)
+- Optimized API requests to prevent timeouts.
+- Fixed bugs in settings retrieval for username & password.
+
+v2.0.0(16 March 2025)
+- Major improvements in UI responsiveness.
+- Switched to using JSON caching for better performance.
+
+v1.0.0 (15 March 2025)
+- Initial release with Live TV support using Xtream API.
