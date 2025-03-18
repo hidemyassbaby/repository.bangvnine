@@ -1,106 +1,119 @@
-import os
 import sys
 import xbmc
+import xbmcaddon
 import xbmcgui
 import xbmcplugin
-import xbmcaddon
-import json
-from urllib.parse import parse_qsl, urlencode
+import urllib.parse
 from resources.lib.xtream_api import XtreamAPI
 from resources.lib.cache import CacheManager
 
+# Initialize Add-on
 ADDON = xbmcaddon.Addon()
-ADDON_PATH = xbmc.translatePath(ADDON.getAddonInfo('path'))
-ICON_PATH = os.path.join(ADDON_PATH, 'resources', 'media')
-HANDLE = int(sys.argv[1])
-
-# API and Cache Setup
 BASE_URL = "http://m3ufilter.media4u.top/player_api.php"
 USERNAME = ADDON.getSetting("username")
 PASSWORD = ADDON.getSetting("password")
+
+# Initialize API and Cache
 API = XtreamAPI(BASE_URL, USERNAME, PASSWORD)
 CACHE = CacheManager()
 
-def get_icon(filename):
-    return os.path.join(ICON_PATH, filename)
-
-def add_directory_item(name, query, icon="folder.png", is_folder=True):
-    url = f"{sys.argv[0]}?{urlencode(query)}"
-    li = xbmcgui.ListItem(name)
-    li.setArt({"icon": get_icon(icon), "thumb": get_icon(icon)})
-    xbmcplugin.addDirectoryItem(HANDLE, url, li, is_folder)
-
 def main_menu():
-    xbmcplugin.setPluginCategory(HANDLE, "Media4u TV")
-    xbmcplugin.setContent(HANDLE, "videos")
+    """Display the main menu."""
+    xbmcplugin.setContent(int(sys.argv[1]), 'videos')
+    
+    # Live TV Categories
+    url = f"{sys.argv[0]}?action=list_categories"
+    li = xbmcgui.ListItem("Live TV Categories")
+    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=li, isFolder=True)
 
-    add_directory_item("Live TV", {"action": "list_categories"}, icon="folder.png")
-    add_directory_item("Search", {"action": "search"}, icon="search.png")
-    add_directory_item("Favorites", {"action": "favorites"}, icon="favorites.png")
+    # Favorites
+    url = f"{sys.argv[0]}?action=favorites"
+    li = xbmcgui.ListItem("Favorites")
+    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=li, isFolder=True)
 
-    xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
 def list_categories():
-    categories = CACHE.get("categories", API.get_live_categories)
+    """List available categories."""
+    categories = CACHE.get_cached_data("categories") or API.get_live_categories()
     
     if not categories:
-        xbmcgui.Dialog().ok("Media4u TV", "No live TV categories found.")
+        xbmcgui.Dialog().ok("Media4u TV", "No categories found or API error occurred!")
         return
 
     for category in categories:
-        add_directory_item(category["category_name"], {"action": "list_streams", "category_id": category["category_id"]}, "folder.png")
+        url = f"{sys.argv[0]}?action=list_streams&category_id={category['category_id']}"
+        li = xbmcgui.ListItem(category["category_name"])
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=li, isFolder=True)
 
-    xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
 def list_streams(category_id):
-    streams = CACHE.get(f"streams_{category_id}", lambda: API.get_live_streams(category_id))
+    """List streams in a selected category."""
+    streams = CACHE.get_cached_data(f"streams_{category_id}") or API.get_live_streams(category_id)
 
     if not streams:
-        xbmcgui.Dialog().ok("Media4u TV", "No streams found in this category.")
+        xbmcgui.Dialog().ok("Media4u TV", "No streams found or API error occurred!")
         return
 
     for stream in streams:
-        add_directory_item(stream["name"], {"action": "play", "stream_id": stream["stream_id"]}, "video.png", False)
+        if "stream_id" not in stream or "name" not in stream:
+            xbmc.log(f"[Media4u TV] Skipping invalid stream entry: {stream}", xbmc.LOGWARNING)
+            continue
 
-    xbmcplugin.endOfDirectory(HANDLE)
+        url = f"{sys.argv[0]}?action=play_stream&stream_url={urllib.parse.quote(stream['stream_url'])}"
+        li = xbmcgui.ListItem(stream["name"])
+        li.setInfo("video", {"title": stream["name"]})
+        li.addContextMenuItems([("Add to Favorites", f"RunPlugin({sys.argv[0]}?action=add_favorite&stream_id={stream['stream_id']})")])
 
-def search():
-    query = xbmcgui.Dialog().input("Search Streams")
-    if not query:
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=li, isFolder=False)
+
+    xbmcplugin.endOfDirectory(int(sys.argv[1]))
+
+def play_stream(stream_url):
+    """Play a selected stream."""
+    li = xbmcgui.ListItem(path=urllib.parse.unquote(stream_url))
+    xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, li)
+
+def add_favorite(stream_id):
+    """Add a stream to favorites."""
+    favorites = CACHE.get_cached_data("favorites") or []
+    if stream_id not in favorites:
+        favorites.append(stream_id)
+        CACHE.set_cache("favorites", favorites)
+        xbmcgui.Dialog().notification("Media4u TV", "Added to favorites!", xbmcgui.NOTIFICATION_INFO)
+
+def show_favorites():
+    """Show favorite streams."""
+    favorites = CACHE.get_cached_data("favorites") or []
+    if not favorites:
+        xbmcgui.Dialog().ok("Media4u TV", "No favorites added yet.")
         return
-    
-    results = API.search(query)
-    if not results:
-        xbmcgui.Dialog().ok("Media4u TV", "No results found.")
-        return
 
-    for stream in results:
-        add_directory_item(stream["name"], {"action": "play", "stream_id": stream["stream_id"]}, "video.png", False)
+    for stream_id in favorites:
+        url = f"{sys.argv[0]}?action=play_stream&stream_url={urllib.parse.quote(API.get_stream_url(stream_id))}"
+        li = xbmcgui.ListItem(f"Favorite Stream {stream_id}")
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=li, isFolder=False)
 
-    xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
-def play(stream_id):
-    stream_url = API.get_stream_url(stream_id)
-    if not stream_url:
-        xbmcgui.Dialog().ok("Media4u TV", "Failed to get stream URL.")
-        return
+def router(paramstring):
+    """Router to handle plugin actions."""
+    params = dict(urllib.parse.parse_qsl(paramstring))
+    action = params.get("action")
 
-    li = xbmcgui.ListItem(path=stream_url)
-    xbmcplugin.setResolvedUrl(HANDLE, True, li)
-
-def router(params):
-    if params:
-        action = params.get("action", None)
-        if action == "list_categories":
-            list_categories()
-        elif action == "list_streams":
-            list_streams(params["category_id"])
-        elif action == "search":
-            search()
-        elif action == "play":
-            play(params["stream_id"])
+    if action == "list_categories":
+        list_categories()
+    elif action == "list_streams":
+        list_streams(params["category_id"])
+    elif action == "play_stream":
+        play_stream(params["stream_url"])
+    elif action == "add_favorite":
+        add_favorite(params["stream_id"])
+    elif action == "favorites":
+        show_favorites()
     else:
         main_menu()
 
-if __name__ == '__main__':
-    router(dict(parse_qsl(sys.argv[2][1:])))
+if __name__ == "__main__":
+    router(sys.argv[2][1:]) if len(sys.argv) > 2 else main_menu()
