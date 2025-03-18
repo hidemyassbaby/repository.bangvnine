@@ -407,7 +407,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.media4utv" name="Media4u TV" version="1.4" provider-name="Bang">
+<addon id="plugin.video.media4utv" name="Media4u TV" version="1.5" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests"/>
@@ -416,6 +416,9 @@ In addition to what livestreams allowed you to do, you can now,
     <extension point="xbmc.python.pluginsource" library="default.py">
         <provides>video</provides>
     </extension>
+
+    <!-- Background Service for Auto-Cache Updates -->
+    <extension point="xbmc.service" library="resources/lib/service.py" start="startup"/>
 
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Media4u TV for Kodi</summary>
