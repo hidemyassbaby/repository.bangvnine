@@ -7,8 +7,8 @@ import os
 # Ensure correct module paths
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
-from xtream_api import XtreamAPI  # ✅ Now directly from lib folder
-from cache import CacheManager  # ✅ Now directly from lib folder
+from xtream_api import XtreamAPI  # ✅ Corrected import
+from cache import CacheManager  # ✅ Corrected import
 
 # Initialize Add-on
 ADDON = xbmcaddon.Addon()
@@ -16,8 +16,10 @@ BASE_URL = "http://m3ufilter.media4u.top/player_api.php"
 USERNAME = ADDON.getSetting("username")
 PASSWORD = ADDON.getSetting("password")
 
-# Initialize API and Cache
-API = XtreamAPI(BASE_URL, USERNAME, PASSWORD)
+# ✅ Ensure XtreamAPI is initialized with the correct parameters
+API = XtreamAPI(BASE_URL, USERNAME, PASSWORD)  # ✅ Fixed
+
+# Initialize Cache
 CACHE = CacheManager()
 
 def update_cache():
