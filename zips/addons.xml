@@ -407,7 +407,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="11.0" provider-name="Bang">
+<addon id="plugin.video.xtreamcodes" name="Xtream Codes IPTV" version="11.1" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests"/>

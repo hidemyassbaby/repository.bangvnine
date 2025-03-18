@@ -25,7 +25,7 @@ def get_settings():
     return {"username": username, "password": password}
 
 def build_main_menu():
-    """ Main Menu - Show Login if Not Logged In, Otherwise Show Categories """
+    """ Main Menu - Show Login if Not Logged In, Otherwise Show Live TV """
     settings = get_settings()
 
     if not settings:
@@ -39,25 +39,61 @@ def build_main_menu():
         open_settings()
         return
 
-    categories = [
-        ("Account Info", "account_info"),
-        ("Live TV", "live"),
-        ("Movies (VOD)", "movies"),
-        ("TV Shows", "series")
-    ]
+    # Live TV Section
+    url = f"{BASE_URL}?mode=live"
+    list_item = xbmcgui.ListItem(label="Live TV")
+    xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
 
-    for name, mode in categories:
-        url = f"{BASE_URL}?mode={urllib.parse.quote(mode)}"
-        list_item = xbmcgui.ListItem(label=name)
-        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
-
+    # Settings Button
     url = f"{BASE_URL}?mode=settings"
     list_item = xbmcgui.ListItem(label="Settings")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
+    # Logout Button
     url = f"{BASE_URL}?mode=logout"
     list_item = xbmcgui.ListItem(label="Logout")
     xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
+
+    xbmcplugin.endOfDirectory(ADDON_HANDLE)
+
+def show_live_categories():
+    """ Display Live TV Categories """
+    settings = get_settings()
+    if not settings:
+        return
+
+    api = XtreamAPI()
+    categories = api.get_live_categories()
+
+    if not categories:
+        xbmcgui.Dialog().ok("Error", "No live TV categories found.")
+        return
+
+    for category in categories:
+        url = f"{BASE_URL}?mode=live_streams&category_id={category['category_id']}"
+        list_item = xbmcgui.ListItem(label=category["category_name"])
+        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=True)
+
+    xbmcplugin.endOfDirectory(ADDON_HANDLE)
+
+def show_live_streams(category_id):
+    """ Display Live TV Streams for a Category """
+    settings = get_settings()
+    if not settings:
+        return
+
+    api = XtreamAPI()
+    streams = api.get_live_streams(category_id)
+
+    if not streams:
+        xbmcgui.Dialog().ok("Error", "No streams found in this category.")
+        return
+
+    for stream in streams:
+        url = f"{stream['stream_url']}"
+        list_item = xbmcgui.ListItem(label=stream["name"])
+        list_item.setProperty("IsPlayable", "true")
+        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE, url=url, listitem=list_item, isFolder=False)
 
     xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
@@ -80,8 +116,10 @@ def router():
 
     if mode is None:
         build_main_menu()
-    elif mode == "login":
-        open_settings()
+    elif mode == "live":
+        show_live_categories()
+    elif mode == "live_streams":
+        show_live_streams(params.get("category_id"))
     elif mode == "settings":
         open_settings()
     elif mode == "logout":
