@@ -1,8 +1,14 @@
 import xbmc
 import xbmcaddon
 import time
-from resources.lib.xtream_api import XtreamAPI 
-from resources.lib.cache import CacheManager  
+import sys
+import os
+
+# Ensure correct module paths
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+
+from xtream_api import XtreamAPI  # ✅ Now directly from lib folder
+from cache import CacheManager  # ✅ Now directly from lib folder
 
 # Initialize Add-on
 ADDON = xbmcaddon.Addon()
