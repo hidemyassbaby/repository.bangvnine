@@ -1,7 +1,7 @@
 import xbmc
 import xbmcaddon
 import time
-from resources.lib.xtream_api import XtreamAPI
+from lib.xtream_api import XtreamAPI
 from resources.lib.cache import CacheManager
 
 ADDON = xbmcaddon.Addon()

@@ -1,38 +1,55 @@
-import xbmc
-import json
 import os
+import json
 import time
+import xbmc
 
-CACHE_FILE = os.path.join(xbmc.translatePath(xbmcaddon.Addon().getAddonInfo('profile')), "cache.json")
+CACHE_DIR = xbmc.translatePath("special://profile/addon_data/plugin.video.media4utv/cache")
+CACHE_FILE = os.path.join(CACHE_DIR, "cache.json")
+CACHE_EXPIRY = 3600  # Cache expires after 1 hour (3600 seconds)
 
 class CacheManager:
     def __init__(self):
-        self.load_cache()
+        """Ensure cache directory exists."""
+        if not os.path.exists(CACHE_DIR):
+            os.makedirs(CACHE_DIR)
 
-    def load_cache(self):
-        if os.path.exists(CACHE_FILE):
-            with open(CACHE_FILE, "r") as file:
-                self.cache = json.load(file)
-        else:
-            self.cache = {}
+    def _load_cache(self):
+        """Load cache data from file."""
+        if not os.path.exists(CACHE_FILE):
+            return {}
 
-    def save_cache(self):
-        with open(CACHE_FILE, "w") as file:
-            json.dump(self.cache, file)
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                cache_data = json.load(f)
+                return cache_data
+        except (json.JSONDecodeError, IOError):
+            return {}
 
-    def get(self, key, fetch_func):
-        if key in self.cache and (time.time() - self.cache[key]["timestamp"] < 3600):
-            return self.cache[key]["data"]
+    def _save_cache(self, cache_data):
+        """Save cache data to file."""
+        try:
+            with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f, indent=4)
+        except IOError:
+            pass
+
+    def get_cached_data(self, key):
+        """Retrieve cached data if it hasn't expired."""
+        cache_data = self._load_cache()
+        if key in cache_data:
+            entry = cache_data[key]
+            if time.time() - entry["timestamp"] < CACHE_EXPIRY:
+                return entry["data"]
         
-        data = fetch_func()
-        if data:
-            self.cache[key] = {"timestamp": time.time(), "data": data}
-            self.save_cache()
+        return None  # Cache expired or key not found
 
-        return data
+    def set_cache(self, key, data):
+        """Store data in cache with timestamp."""
+        cache_data = self._load_cache()
+        cache_data[key] = {"timestamp": time.time(), "data": data}
+        self._save_cache(cache_data)
 
-    def update(self, key, fetch_func):
-        data = fetch_func()
-        if data:
-            self.cache[key] = {"timestamp": time.time(), "data": data}
-            self.save_cache()
+    def clear_cache(self):
+        """Clear all cached data."""
+        if os.path.exists(CACHE_FILE):
+            os.remove(CACHE_FILE)
