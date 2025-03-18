@@ -1,9 +1,9 @@
 import os
 import json
 import time
-import xbmc
+import xbmcvfs  # ✅ Correct module for Kodi 19+
 
-CACHE_DIR = xbmc.translatePath("special://profile/addon_data/plugin.video.media4utv/cache")
+CACHE_DIR = xbmcvfs.translatePath("special://profile/addon_data/plugin.video.media4utv/cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "cache.json")
 CACHE_EXPIRY = 3600  # Cache expires after 1 hour (3600 seconds)
 
