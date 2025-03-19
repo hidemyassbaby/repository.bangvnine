@@ -10,30 +10,57 @@ from resources.lib.cache import CacheManager
 
 # Add-on Info
 ADDON = xbmcaddon.Addon()
+ADDON_ID = ADDON.getAddonInfo("id")
 ADDON_NAME = ADDON.getAddonInfo("name")
 CACHE = CacheManager()
 
-# M3U URL (Uses username/password from settings)
+# Get Username & Password from Settings
 USERNAME = ADDON.getSetting("username")
 PASSWORD = ADDON.getSetting("password")
 M3U_URL = f"https://m3ufilter.media4u.top/get.php?username={USERNAME}&password={PASSWORD}&type=m3u_plus"
 
 def main_menu():
-    """Display the main menu."""
+    """Display the main menu based on login status."""
     xbmcplugin.setPluginCategory(int(sys.argv[1]), ADDON_NAME)
 
-    # Check cache expiry on start, force update if needed
-    if CACHE.is_cache_expired():
-        force_update()
+    if not USERNAME or not PASSWORD:
+        add_directory_item("Login", "open_settings", is_folder=False)
+    else:
+        if CACHE.is_cache_expired():
+            force_update()  # Update on startup if needed
 
-    add_directory_item("Force Update", "force_update", is_folder=False)
-    add_directory_item("Live TV Categories", "list_categories", is_folder=True)
-    add_directory_item("Search", "search", is_folder=False)
+        add_directory_item("Force Update", "force_update", is_folder=False)
+        add_directory_item("Live TV Categories", "list_categories", is_folder=True)
+        add_directory_item("Search", "search", is_folder=False)
 
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
+def open_settings():
+    """Open Addon Settings, wait for input, and restart addon if credentials are entered."""
+    xbmc.executebuiltin(f"Addon.OpenSettings({ADDON_ID})")
+
+    # Wait for settings dialog to close
+    monitor = xbmc.Monitor()
+    while xbmc.getCondVisibility("Window.IsVisible(10140)"):  # 10140 = Settings Window ID
+        if monitor.waitForAbort(1):  
+            return  # Exit if Kodi is shutting down
+
+    # Refresh username/password after user input
+    updated_username = ADDON.getSetting("username")
+    updated_password = ADDON.getSetting("password")
+
+    if updated_username and updated_password:
+        force_update()  # Update cache after login
+        xbmc.executebuiltin("Container.Refresh")  # Refresh UI
+        xbmc.executebuiltin(f"RunAddon({ADDON_ID})")  # Restart addon
+
 def force_update():
-    """Trigger a forced update."""
+    """Trigger a forced update of M3U data and cache."""
+    if not USERNAME or not PASSWORD:
+        xbmcgui.Dialog().ok(ADDON_NAME, "No login details found. Please enter credentials first.")
+        open_settings()
+        return
+
     dialog = xbmcgui.DialogProgress()
     dialog.create("Updating Data", "Fetching latest channel list, please wait...")
 
@@ -41,18 +68,23 @@ def force_update():
         response = requests.get(M3U_URL, timeout=15)
         response.raise_for_status()
         m3u_data = response.text
-        parsed_data = parse_m3u(m3u_data)
 
+        if not m3u_data.strip():
+            xbmcgui.Dialog().ok(ADDON_NAME, "Server returned empty data. Try again later.")
+            return
+
+        parsed_data = parse_m3u(m3u_data)
         if parsed_data:
             CACHE.save_cache(parsed_data)
-            xbmcgui.Dialog().ok(ADDON_NAME, "Data Updated Successfully")
+            xbmcgui.Dialog().ok(ADDON_NAME, "Update successful!")
         else:
             xbmcgui.Dialog().ok(ADDON_NAME, "Failed to parse data.")
-    except requests.exceptions.RequestException:
-        xbmcgui.Dialog().ok(ADDON_NAME, "Failed to fetch data! Check your connection.")
+
+    except requests.exceptions.RequestException as e:
+        xbmcgui.Dialog().ok(ADDON_NAME, f"Failed to fetch data:\n{e}")
     finally:
         dialog.close()
-        xbmc.executebuiltin("Container.Refresh")  # Refresh Kodi UI
+        xbmc.executebuiltin("Container.Refresh")  # Refresh UI
 
 def parse_m3u(m3u_data):
     """Convert M3U into structured categories & streams."""
@@ -143,6 +175,8 @@ def router(param_string):
         list_streams(params.get("category", ""))
     elif action == "play_stream":
         play_stream(params.get("url", ""))
+    elif action == "open_settings":
+        open_settings()
     else:
         main_menu()
 

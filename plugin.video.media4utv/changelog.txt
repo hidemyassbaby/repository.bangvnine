@@ -1,3 +1,10 @@
+v4.1.1 (20 March 2025)
+- Ensured login button only appears when no credentials are set.
+- Improved UI flow when credentials are missing:
+  - Shows only the "Login" button.
+- Enhanced caching to check on launch and update expired data.
+- Fixed background update issue that caused unnecessary popups.
+
 v4.1.0 (19 March 2025)
 - Fixed issue where Live TV categories were showing timestamps & incorrect data.
 - Ensured streams play correctly when clicked.
@@ -19,7 +26,7 @@ v3.0.0 (17 March 2025)
 - Optimized API requests to prevent timeouts.
 - Fixed bugs in settings retrieval for username & password.
 
-v2.0.0(16 March 2025)
+v2.0.0 (16 March 2025)
 - Major improvements in UI responsiveness.
 - Switched to using JSON caching for better performance.
 
