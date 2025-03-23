@@ -1,3 +1,39 @@
+ v4.2.0 (23 March 2025)
+This is a major quality-of-life update that brings more flexibility, stability, and compatibility.
+
+Key Improvements:
+Dual Mode Support:
+The addon now fully supports both M3U and Xtream Codes (XC) API. You can choose which mode to use via the settings menu.
+
+Structured Content Layout:
+All categories are now separated cleanly into:
+
+Live TV
+
+VOD (Movies)
+
+Series (TV Shows)
+Each section shows only the correct groupings, filtering out unrelated content (e.g., VOD won't show up in Live TV).
+
+Custom Credentials Support:
+Don’t want to use the default server?
+Enter your own server URL, username, and password in the settings, and the addon will automatically use those — completely bypassing the built-in media4u account.
+
+M3U as Default Mode:
+Since many servers have broken or limited Xtream API support, the addon now defaults to using the M3U playlist format, which works reliably with most IPTV providers.
+
+Auto Caching for Speed:
+To improve performance, the addon now caches M3U data for 1 hour. This drastically speeds up loading times and reduces repeated server requests.
+
+The cache updates silently in the background.
+
+Expired data is refreshed automatically when needed.
+
+Improved Kodi Compatibility:
+Replaced outdated functions (xbmc.translatePath) with modern ones (xbmcvfs.translatePath) to ensure the addon runs smoothly on Kodi 20+.
+
+
+
 v4.1.1 (20 March 2025)
 - Ensured login button only appears when no credentials are set.
 - Improved UI flow when credentials are missing:

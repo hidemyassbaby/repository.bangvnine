@@ -1,6 +1,9 @@
 <settings>
-    <category label="Login Details">
-        <setting id="username" type="text" label="Username" default="" />
-        <setting id="password" type="text" label="Password" default="" option="hidden" />
+    <category label="IPTV Settings">
+        <setting id="use_m3u_mode" type="bool" label="Use M3U Mode Instead of API" default="true" />
+        <setting id="server_url" type="text" label="Xtream Server URL" />
+        <setting id="username" type="text" label="Username" />
+        <setting id="password" type="text" label="Password" option="hidden" />
+
     </category>
 </settings>

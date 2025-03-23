@@ -1,184 +1,181 @@
-import os
 import sys
-import xbmc
-import xbmcaddon
+import urllib.parse
 import xbmcplugin
 import xbmcgui
-import xbmcvfs
+import xbmcaddon
+import xbmc
 import requests
-from resources.lib.cache import CacheManager
+import re
+import os
+import time
+import hashlib
+from xbmcvfs import translatePath
+from collections import defaultdict
 
-# Add-on Info
-ADDON = xbmcaddon.Addon()
-ADDON_ID = ADDON.getAddonInfo("id")
-ADDON_NAME = ADDON.getAddonInfo("name")
-CACHE = CacheManager()
+addon = xbmcaddon.Addon()
+HANDLE = int(sys.argv[1])
+BASE_URL = sys.argv[0]
 
-# Get Username & Password from Settings
-USERNAME = ADDON.getSetting("username")
-PASSWORD = ADDON.getSetting("password")
-M3U_URL = f"https://m3ufilter.media4u.top/get.php?username={USERNAME}&password={PASSWORD}&type=m3u_plus"
+USE_M3U = addon.getSettingBool("use_m3u_mode")
+SERVER = addon.getSetting("server_url").strip() or "https://m3ufilter.media4u.top"
+USERNAME = addon.getSetting("username").strip() or "media4u"
+PASSWORD = addon.getSetting("password").strip() or "media4u"
+CACHE_EXPIRY = 3600  # 1 hour
+CACHE_PATH = translatePath(addon.getAddonInfo('profile')).rstrip('/')
+if not os.path.exists(CACHE_PATH):
+    os.makedirs(CACHE_PATH)
 
-def main_menu():
-    """Display the main menu based on login status."""
-    xbmcplugin.setPluginCategory(int(sys.argv[1]), ADDON_NAME)
+M3U_URL = f"{SERVER}/get.php?username={USERNAME}&password={PASSWORD}&type=m3u_plus"
 
-    if not USERNAME or not PASSWORD:
-        add_directory_item("Login", "open_settings", is_folder=False)
-    else:
-        if CACHE.is_cache_expired():
-            force_update()  # Update on startup if needed
+HEADERS = {
+    "User-Agent": "Dalvik/2.1.0 (Linux; Android 9) IPTV",
+    "Accept": "*/*",
+    "Accept-Encoding": "gzip",
+    "Connection": "Keep-Alive"
+}
 
-        add_directory_item("Force Update", "force_update", is_folder=False)
-        add_directory_item("Live TV Categories", "list_categories", is_folder=True)
-        add_directory_item("Search", "search", is_folder=False)
+def build_url(query):
+    return BASE_URL + '?' + urllib.parse.urlencode(query)
 
-    xbmcplugin.endOfDirectory(int(sys.argv[1]))
+def fetch_api(endpoint):
+    sep = '&' if '?' in endpoint else '?'
+    url = f"{SERVER}/{endpoint}{sep}username={USERNAME}&password={PASSWORD}"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        xbmc.log(f"[Media4u] API error: {e}", xbmc.LOGERROR)
+        return {}
 
-def open_settings():
-    """Open Addon Settings, wait for input, and restart addon if credentials are entered."""
-    xbmc.executebuiltin(f"Addon.OpenSettings({ADDON_ID})")
+def get_cache_filename(url):
+    key = hashlib.md5(url.encode('utf-8')).hexdigest()
+    return os.path.join(CACHE_PATH, f"cache_{key}.txt")
 
-    # Wait for settings dialog to close
-    monitor = xbmc.Monitor()
-    while xbmc.getCondVisibility("Window.IsVisible(10140)"):  # 10140 = Settings Window ID
-        if monitor.waitForAbort(1):  
-            return  # Exit if Kodi is shutting down
-
-    # Refresh username/password after user input
-    updated_username = ADDON.getSetting("username")
-    updated_password = ADDON.getSetting("password")
-
-    if updated_username and updated_password:
-        force_update()  # Update cache after login
-        xbmc.executebuiltin("Container.Refresh")  # Refresh UI
-        xbmc.executebuiltin(f"RunAddon({ADDON_ID})")  # Restart addon
-
-def force_update():
-    """Trigger a forced update of M3U data and cache."""
-    if not USERNAME or not PASSWORD:
-        xbmcgui.Dialog().ok(ADDON_NAME, "No login details found. Please enter credentials first.")
-        open_settings()
-        return
-
-    dialog = xbmcgui.DialogProgress()
-    dialog.create("Updating Data", "Fetching latest channel list, please wait...")
+def fetch_m3u(url):
+    cache_file = get_cache_filename(url)
+    if os.path.exists(cache_file):
+        mtime = os.path.getmtime(cache_file)
+        if time.time() - mtime < CACHE_EXPIRY:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                return f.read()
 
     try:
-        response = requests.get(M3U_URL, timeout=15)
+        response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
-        m3u_data = response.text
+        content = response.text
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return content
+    except Exception as e:
+        xbmc.log(f"[Media4u] M3U error: {e}", xbmc.LOGERROR)
+        return ""
 
-        if not m3u_data.strip():
-            xbmcgui.Dialog().ok(ADDON_NAME, "Server returned empty data. Try again later.")
-            return
+def parse_m3u(data):
+    pattern = re.compile(r'#EXTINF:-1.*?tvg-logo="([^"]*)".*?group-title="([^"]*)".*?,(.*?)\n(.*?)\n', re.DOTALL)
+    return pattern.findall(data)
 
-        parsed_data = parse_m3u(m3u_data)
-        if parsed_data:
-            CACHE.save_cache(parsed_data)
-            xbmcgui.Dialog().ok(ADDON_NAME, "Update successful!")
+def list_m3u_group_category(group_type):
+    raw_data = fetch_m3u(M3U_URL)
+    streams = parse_m3u(raw_data)
+    grouped = defaultdict(list)
+    for logo, group, name, url in streams:
+        key = group.strip().lower()
+        if group_type.lower() == "live" and not any(x in key for x in ["vod", "movie", "series", "show"]):
+            grouped[group].append((logo, name, url))
+        elif group_type.lower() == "vod" and ("vod" in key or "movie" in key):
+            grouped[group].append((logo, name, url))
+        elif group_type.lower() == "series" and ("series" in key or "show" in key):
+            grouped[group].append((logo, name, url))
+
+    for group, items in sorted(grouped.items()):
+        li = xbmcgui.ListItem(label=f"{group} (M3U)")
+        url = build_url({'mode': 'm3u_group_items', 'group': group})
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, True)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def list_m3u_items_by_group(group):
+    raw_data = fetch_m3u(M3U_URL)
+    streams = parse_m3u(raw_data)
+    for logo, g, name, url in streams:
+        if g != group:
+            continue
+        li = xbmcgui.ListItem(label=name)
+        li.setArt({'thumb': logo, 'icon': logo, 'poster': logo})
+        li.setInfo('video', {'title': name})
+        li.setPath(url)
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, False)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def list_categories(action, next_mode):
+    data = fetch_api(f"player_api.php?action={action}")
+    for cat in data:
+        name = cat.get("category_name")
+        cat_id = cat.get("category_id")
+        li = xbmcgui.ListItem(label=name)
+        xbmcplugin.addDirectoryItem(HANDLE, build_url({'mode': next_mode, 'cat_id': cat_id}), li, True)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def list_streams(content_type, cat_id):
+    all_data = fetch_api("player_api.php")
+    key_map = {'live': 'live_streams', 'vod': 'movie_streams', 'series': 'series'}
+    streams = all_data.get(key_map.get(content_type, ''), [])
+    for item in streams:
+        if str(item.get("category_id")) != str(cat_id):
+            continue
+        name = item.get("name")
+        stream_id = item.get("stream_id")
+        icon = item.get("stream_icon", "")
+        url = f"{SERVER}/{content_type}/{USERNAME}/{PASSWORD}/{stream_id}.ts"
+        li = xbmcgui.ListItem(label=name)
+        li.setArt({'thumb': icon, 'icon': icon, 'poster': icon})
+        li.setInfo('video', {'title': name})
+        li.setPath(url)
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, False)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def main_menu():
+    xbmcplugin.setPluginCategory(HANDLE, 'Media4u IPTV')
+    xbmcplugin.setContent(HANDLE, 'videos')
+    suffix = " (M3U)" if USE_M3U else ""
+    items = [
+        (f'Live TV{suffix}', 'live_categories'),
+        (f'Movies{suffix}', 'vod_categories'),
+        (f'Series{suffix}', 'series_categories'),
+    ]
+    for label, mode in items:
+        li = xbmcgui.ListItem(label=label)
+        xbmcplugin.addDirectoryItem(HANDLE, build_url({'mode': mode}), li, True)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def router(paramstring):
+    params = dict(urllib.parse.parse_qsl(paramstring))
+    mode = params.get('mode')
+
+    if USE_M3U:
+        if mode == 'live_categories':
+            list_m3u_group_category('live')
+        elif mode == 'vod_categories':
+            list_m3u_group_category('vod')
+        elif mode == 'series_categories':
+            list_m3u_group_category('series')
+        elif mode == 'm3u_group_items':
+            list_m3u_items_by_group(params.get('group'))
         else:
-            xbmcgui.Dialog().ok(ADDON_NAME, "Failed to parse data.")
-
-    except requests.exceptions.RequestException as e:
-        xbmcgui.Dialog().ok(ADDON_NAME, f"Failed to fetch data:\n{e}")
-    finally:
-        dialog.close()
-        xbmc.executebuiltin("Container.Refresh")  # Refresh UI
-
-def parse_m3u(m3u_data):
-    """Convert M3U into structured categories & streams."""
-    categories = {}
-    lines = m3u_data.split("\n")
-
-    for i, line in enumerate(lines):
-        if line.startswith("#EXTINF"):
-            parts = line.split(" ")
-            name = line.split(",")[-1].strip()
-            category = "Uncategorized"
-            logo = ""
-
-            # Extract Metadata
-            for part in parts:
-                if "group-title" in part:
-                    category = part.split("=")[-1].replace('"', '').strip()
-                if "tvg-logo" in part:
-                    logo = part.split("=")[-1].replace('"', '').strip()
-
-            # Get Stream URL
-            if i + 1 < len(lines):
-                url = lines[i + 1].strip()
-                if url.startswith("http"):
-                    if category not in categories:
-                        categories[category] = []
-                    categories[category].append({"name": name, "url": url, "logo": logo})
-
-    return categories
-
-def list_categories():
-    """List Live TV categories."""
-    categories = CACHE.load_cache()
-
-    if not categories:
-        xbmcgui.Dialog().ok(ADDON_NAME, "No categories found. Try updating.")
+            main_menu()
         return
 
-    for category in categories.keys():
-        add_directory_item(category, "list_streams", is_folder=True, params={"category": category})
-
-    xbmcplugin.endOfDirectory(int(sys.argv[1]))
-
-def list_streams(category):
-    """List streams within a selected category."""
-    categories = CACHE.load_cache()
-
-    if not categories or category not in categories:
-        xbmcgui.Dialog().ok(ADDON_NAME, "No streams found in this category.")
-        return
-
-    streams = categories[category]
-
-    for stream in streams:
-        add_directory_item(stream["name"], "play_stream", is_folder=False, params={"url": stream["url"]}, stream_url=stream["url"])
-
-    xbmcplugin.endOfDirectory(int(sys.argv[1]))
-
-def play_stream(url):
-    """Play the selected stream."""
-    list_item = xbmcgui.ListItem(path=url)
-    list_item.setProperty("IsPlayable", "true")
-    xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, list_item)
-
-def add_directory_item(name, action, is_folder=True, params={}, stream_url=None):
-    """Helper function to add items to the Kodi directory."""
-    url = f"{sys.argv[0]}?action={action}"
-    for key, value in params.items():
-        url += f"&{key}={value}"
-    
-    list_item = xbmcgui.ListItem(label=name)
-    if stream_url:
-        list_item.setProperty("IsPlayable", "true")
-        list_item.setPath(stream_url)
-
-    xbmcplugin.addDirectoryItem(int(sys.argv[1]), url, list_item, isFolder=is_folder)
-
-def router(param_string):
-    """Route actions based on user selection."""
-    params = dict(arg.split("=") for arg in param_string.split("&") if "=" in arg)
-    action = params.get("action", "")
-
-    if action == "force_update":
-        force_update()
-    elif action == "list_categories":
-        list_categories()
-    elif action == "list_streams":
-        list_streams(params.get("category", ""))
-    elif action == "play_stream":
-        play_stream(params.get("url", ""))
-    elif action == "open_settings":
-        open_settings()
+    cat_id = params.get('cat_id')
+    if mode == 'live_categories':
+        list_categories('get_live_categories', 'live')
+    elif mode == 'vod_categories':
+        list_categories('get_vod_categories', 'vod')
+    elif mode == 'series_categories':
+        list_categories('get_series_categories', 'series')
+    elif mode in ['live', 'vod', 'series']:
+        list_streams(mode, cat_id)
     else:
         main_menu()
 
-if __name__ == "__main__":
-    router(sys.argv[2][1:]) if len(sys.argv) > 2 else main_menu()
+if __name__ == '__main__':
+    router(sys.argv[2][1:])
