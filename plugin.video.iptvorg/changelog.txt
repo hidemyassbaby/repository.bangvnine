@@ -1,4 +1,4 @@
-Version 1.0.0 (Initial Release) 24th March 2025
+Version 1.0.1 (Initial Release) 24th March 2025
 Initial Release of IPTV-Org Addon.
 
 Features Live TV
