@@ -1,0 +1,14 @@
+Version 1.0.0 (Initial Release) 24th March 2025
+Initial Release of IPTV-Org Addon.
+
+Features Live TV
+
+PIN Protection: Protects adult content behind a PIN.
+
+Developer Mode: Enables a developer mode that allows bypassing the PIN and extra debugging.
+
+Favourites Management: Users can add or remove channels to/from their favourites.
+
+M3U Channel Integration: Fetches IPTV channels via M3U.
+
+Settings Menu: Allows users to update TV channels, set/reset PIN, toggle Developer Mode, and view changelog.
