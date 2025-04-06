@@ -4,14 +4,19 @@ import urllib.parse
 import xbmcplugin
 import xbmcgui
 import xbmcaddon
+import xbmc
 import json
 import requests
 
 addon = xbmcaddon.Addon()
 handle = int(sys.argv[1])
 
-# Always load the main SportShroud menu
-menu_url = "https://raw.githubusercontent.com/hidemyassbaby/SportShroud/refs/heads/main/Main%20Menu/SportShroudMenu.json"
+# Parse plugin parameters
+params = dict(urllib.parse.parse_qsl(sys.argv[2][1:]))
+menu_url = params.get("url")
+if not menu_url:
+    # Default to main menu
+    menu_url = "https://raw.githubusercontent.com/hidemyassbaby/SportShroud/refs/heads/main/Main%20Menu/SportShroudMenu.json"
 
 # Function to build a Kodi URL
 def build_url(query):
@@ -20,12 +25,17 @@ def build_url(query):
 # Function to open a remote JSON URL and return parsed data
 def get_json(url):
     try:
+        xbmc.log(f"[SportShroud] Fetching JSON from: {url}", level=xbmc.LOGINFO)
         response = requests.get(url)
         return response.json()
-    except:
+    except Exception as e:
+        xbmc.log(f"[SportShroud] Failed to fetch JSON from {url}: {e}", level=xbmc.LOGERROR)
         return []
 
-# Load the main menu
+# Log which URL is being opened
+xbmc.log(f"[SportShroud] Loading menu from: {menu_url}", level=xbmc.LOGINFO)
+
+# Load the menu
 menu = get_json(menu_url)
 
 for item in menu:
@@ -36,20 +46,7 @@ for item in menu:
     if item.get("thumb"):
         li.setArt({"thumb": item["thumb"], "icon": item["thumb"], "poster": item["thumb"]})
     url = item.get("url", "")
-    if url.endswith(".json"):
-        # It's a final stream list
-        streams = get_json(url)
-        if isinstance(streams, list):
-            for stream in streams:
-                title = stream.get("name", "Stream")
-                stream_li = xbmcgui.ListItem(label=title)
-                stream_li.setProperty("IsPlayable", "true")
-                stream_li.setPath(stream.get("url"))
-                xbmcplugin.addDirectoryItem(handle, stream.get("url"), stream_li, isFolder=False)
-            xbmcplugin.endOfDirectory(handle)
-            sys.exit()
-    else:
-        dir_url = build_url({"name": item.get("name"), "url": url})
-        xbmcplugin.addDirectoryItem(handle, dir_url, li, isFolder=True)
+    dir_url = build_url({"name": item.get("name"), "url": url})
+    xbmcplugin.addDirectoryItem(handle, dir_url, li, isFolder=True)
 
 xbmcplugin.endOfDirectory(handle)
