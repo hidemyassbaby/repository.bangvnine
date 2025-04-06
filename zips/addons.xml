@@ -455,6 +455,30 @@ In addition to what livestreams allowed you to do, you can now,
     </extension>
 </addon>
 
+<addon id="plugin.video.sportshroud" name="SportShroud" version="1.0.2" provider-name="Bang">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+        <import addon="script.module.requests"/>
+    </requires>
+
+    <extension point="xbmc.python.pluginsource" library="default.py">
+        <provides>video</provides>
+    </extension>
+
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en_GB">SportShroud - TV</summary>
+        <description lang="en_GB">SportShroud TV Addon</description>
+        <platform>all</platform>
+        <language>en_GB</language>
+        <license>GPL-2.0-or-later</license>
+        <disclaimer>This add-on does not host any content.</disclaimer>
+        <assets>
+            <icon>icon.png</icon>
+            <fanart>fanart.jpg</fanart>
+        </assets>
+    </extension>
+</addon>
+
 <addon id="plugin.video.zoechip" name="Zoe Chip" version="1.0" provider-name="Bang">    <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests" />
