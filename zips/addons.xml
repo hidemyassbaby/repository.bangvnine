@@ -455,6 +455,23 @@ In addition to what livestreams allowed you to do, you can now,
     </extension>
 </addon>
 
+<addon id="plugin.video.nocable" name="No Cable" version="1.1" provider-name="Bang">
+  <extension point="xbmc.python.pluginsource"
+			library="default.py">
+		<provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+	<summary lang="en">No Cable TV</summary>
+	<language>en</language>
+	<description lang="en">No Cable TV is a versatile live TV add-on offering a wide range of streaming options. Enjoy access to live TV channels from around the world, plus a large library of movies and TV shows—all without needing a traditional cable subscription. With a sleek interface and reliable streaming, No Cable TV lets you watch your favorite content anytime, anywhere, making it perfect for cord-cutters seeking easy access to live broadcasts and on-demand entertainment.</description>
+	<platform>all</platform>
+	<assets>
+		<icon>icon.png</icon>
+		<fanart>fanart.jpg</fanart>
+	</assets>
+  </extension>
+</addon>
+
 <addon id="plugin.video.sportshroud" name="SportShroud" version="2.0.0" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>

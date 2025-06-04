@@ -1,0 +1,14 @@
+<settings>
+    <category label="General">
+        <!-- Hidden pre-configured login settings -->
+        <setting id="DNS" type="text" label="DNS" default="http://nocable.cc:8080" visible="false" />
+        <setting id="Username" type="text" label="Username" default="5467546" visible="false" />
+        <setting id="Password" type="text" label="Password" default="3648794" visible="false" />
+
+        <!-- Optional user-visible toggles -->
+        <setting id="meta" type="bool" label="Enable VOD Metadata" default="false" />
+        <setting id="hidexxx" type="bool" label="Hide Adult Content" default="true" />
+        <setting id="xxx_pwset" type="bool" label="Enable Adult Content Lock" default="false" />
+        <setting id="xxx_pw" option="hidden" type="text" label="Adult Content Password" default="1234" />
+    </category>
+</settings>
