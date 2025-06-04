@@ -126,7 +126,7 @@ def home():
     tools.addDir('Video On Demand','vod',3,iconMoviesod,background,'')
     tools.addDir('Search','url',5,iconsearch,background,'')
     tools.addDir('Settings','url',8,iconsettings,background,'')
-    # tools.addDir('Extras','url',16,iconextras,background,'')
+    tools.addDir('Extras','url',16,iconextras,background,'')
 
 def livecategory():
     open = tools.OPEN_URL(live_url)

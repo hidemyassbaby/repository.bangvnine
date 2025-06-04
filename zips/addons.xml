@@ -455,7 +455,7 @@ In addition to what livestreams allowed you to do, you can now,
     </extension>
 </addon>
 
-<addon id="plugin.video.nocable" name="No Cable" version="1.3" provider-name="Bang">
+<addon id="plugin.video.nocable" name="No Cable" version="1.5" provider-name="Bang">
   <extension point="xbmc.python.pluginsource"
 			library="default.py">
 		<provides>video</provides>
