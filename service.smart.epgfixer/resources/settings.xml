@@ -1,0 +1,6 @@
+<settings>
+    <category label="EPG Cleanup Settings">
+        <setting id="run_mode" type="enum" label="Run EPG Cleanup" values="every_x_days|every_startup|manual" default="every_x_days" />
+        <setting id="days_interval" type="number" label="Interval in Days" default="7" step="1" visible="eq(run_mode, every_x_days)" />
+    </category>
+</settings>

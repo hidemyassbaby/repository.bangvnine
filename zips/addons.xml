@@ -752,4 +752,16 @@ In addition to what livestreams allowed you to do, you can now,
     <news></news>
     </extension>
 </addon>
+
+<addon id="service.smart.epgfixer" version="1.0.0" name="Smart EPG Fixer" provider-name="Bang">
+    <extension point="xbmc.service" library="service.py" start="startup" />
+    <extension point="xbmc.python.script" library="service.py">
+        <provides>executable</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary>Automatically clears old EPG data and refreshes IPTV playlists to keep your guide working perfectly.</summary>
+        <description>Smart EPG Fixer clears outdated EPG database files and IPTV Simple cache, then triggers IPTV Merge (if instaled) to rebuild your playlist and guide — keeping your TV guide fresh and synced with sources</description>
+        <platform>all</platform>
+    </extension>
+</addon>
 </addons>
