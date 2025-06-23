@@ -1,143 +1,103 @@
-import os
-import time
-import sys
+# Smart EPG Fixer: Full updated service.py with IPTV Merge integration
+
 import xbmc
 import xbmcaddon
+import xbmcgui
 import xbmcvfs
-from xbmcgui import Dialog
+import os
+import datetime
+import time
 
-addon = xbmcaddon.Addon()
-ADDON_ID = "service.smart.epgfixer"
-FOLDER = xbmcvfs.translatePath(f"special://userdata/addon_data/{ADDON_ID}")
-LAST_RUN_FILE = os.path.join(FOLDER, "last_run.txt")
-FIRST_RUN_FILE = os.path.join(FOLDER, "firstrun.txt")
-CHECK_INTERVAL = 6 * 60 * 60
+ADDON = xbmcaddon.Addon()
+ADDON_ID = ADDON.getAddonInfo('id')
+ADDON_NAME = ADDON.getAddonInfo('name')
+PROFILE = xbmc.translatePath(ADDON.getAddonInfo('profile'))
+SETTINGS_FILE = os.path.join(PROFILE, 'settings.xml')
+LAST_RUN_FILE = os.path.join(PROFILE, 'last_run.txt')
+MERGE_FLAG = '_iptv_merge_force_run'
+
+DEFAULT_DAYS = 7
+MERGE_PLUGIN_URL = 'plugin://plugin.program.iptv.merge/?_=merge'
+
+if not xbmcvfs.exists(PROFILE):
+    xbmcvfs.mkdirs(PROFILE)
+
+monitor = xbmc.Monitor()
 
 def log(msg):
-    xbmc.log(f"[Smart EPG Fixer] {msg}", xbmc.LOGINFO)
+    xbmc.log(f"[{ADDON_NAME}] {msg}", xbmc.LOGNOTICE)
 
-def notify(title, message, duration=4000):
-    xbmc.executebuiltin(f'Notification({title},{message},{duration})')
+def notify(message):
+    xbmcgui.Dialog().notification(ADDON_NAME, message, xbmcgui.NOTIFICATION_INFO, 5000)
 
-def ensure_data_folder():
-    if not os.path.exists(FOLDER):
-        os.makedirs(FOLDER)
+def get_last_run():
+    if xbmcvfs.exists(LAST_RUN_FILE):
+        with xbmcvfs.File(LAST_RUN_FILE) as f:
+            content = f.read().decode('utf-8')
+            try:
+                return datetime.datetime.strptime(content, '%Y-%m-%d')
+            except:
+                return None
+    return None
 
-def get_last_run_time():
-    if not os.path.exists(LAST_RUN_FILE):
-        return 0
-    try:
-        with open(LAST_RUN_FILE, "r") as f:
-            return float(f.read().strip())
-    except:
-        return 0
+def set_last_run():
+    with xbmcvfs.File(LAST_RUN_FILE, 'w') as f:
+        f.write(datetime.datetime.now().strftime('%Y-%m-%d'))
 
-def update_last_run_time():
-    with open(LAST_RUN_FILE, "w") as f:
-        f.write(str(time.time()))
-    log("Updated last run time.")
-
-def is_first_run():
-    return not os.path.exists(FIRST_RUN_FILE)
-
-def mark_first_run_complete():
-    with open(FIRST_RUN_FILE, "w") as f:
-        f.write("done")
-
-def show_schedule_selector():
-    options = ["Every startup (advanced)"] + [f"Every {i} day{'s' if i > 1 else ''}" for i in range(1, 31)]
-    default_index = 6  # 7 days
-    selection = Dialog().select("How often should Smart EPG Fixer run?", options, preselect=default_index)
-
-    if selection == -1:
-        addon.setSetting("run_mode", "every_7_days")
-        notify("Smart EPG Fixer", "Using default: Every 7 days", 4000)
-    elif selection == 0:
-        addon.setSetting("run_mode", "every_startup")
-        notify("Smart EPG Fixer", "Schedule: Every startup", 4000)
+def epg_cleanup():
+    epg_path = xbmc.translatePath("special://userdata/Database/Epg11.db")
+    if xbmcvfs.exists(epg_path):
+        xbmcvfs.delete(epg_path)
+        log("Deleted EPG database.")
     else:
-        addon.setSetting("run_mode", f"every_{selection}_days")
-        notify("Smart EPG Fixer", f"Schedule: Every {selection} day(s)", 4000)
+        log("No EPG database found to delete.")
 
-def delete_epg_files():
-    epg_db_path = xbmcvfs.translatePath("special://userdata/Database")
-    iptv_cache_path = xbmcvfs.translatePath("special://userdata/addon_data/pvr.iptvsimple")
-
-    for fname in os.listdir(epg_db_path):
-        if fname.startswith("Epg") and fname.endswith(".db"):
-            try:
-                os.remove(os.path.join(epg_db_path, fname))
-                log(f"Deleted EPG DB: {fname}")
-            except Exception as e:
-                log(f"Failed to delete {fname}: {e}")
-
-    if os.path.exists(iptv_cache_path):
-        for fname in os.listdir(iptv_cache_path):
-            try:
-                os.remove(os.path.join(iptv_cache_path, fname))
-                log(f"Deleted IPTV cache: {fname}")
-            except Exception as e:
-                log(f"Failed to delete {fname}: {e}")
+def wait_for_pvr():
+    timeout = 60
+    log("Waiting for PVR to load channels...")
+    while timeout > 0:
+        if xbmc.getCondVisibility('Pvr.HasTVChannels'):
+            log("PVR channels detected.")
+            return
+        time.sleep(1)
+        timeout -= 1
+    log("Timed out waiting for PVR channels.")
 
 def run_merge():
-    if xbmc.getCondVisibility("System.HasAddon(program.iptv.merge)"):
-        xbmc.executebuiltin("RunPlugin(plugin://program.iptv.merge/?mode=run)")
-        log("Triggered IPTV Merge")
-        notify("Smart EPG Fixer", "IPTV Merge complete ✅", 4000)
+    notify("Starting IPTV Merge")
+    xbmc.executebuiltin(f'RunPlugin({MERGE_PLUGIN_URL})')
+    log("Triggered IPTV Merge plugin silently.")
+
+def first_run_popup():
+    options = [f"Every {i} Days" for i in range(1, 31)] + ["Every Kodi Startup"]
+    selection = xbmcgui.Dialog().select("How often should cleanup run?", options)
+    if selection == -1:
+        return DEFAULT_DAYS
+    if selection == 30:
+        ADDON.setSetting('run_on_start', 'true')
+        return -1
     else:
-        log("IPTV Merge not installed — skipping merge step.")
+        ADDON.setSetting('run_on_start', 'false')
+        ADDON.setSettingInt('interval_days', selection + 1)
+        return selection + 1
 
-def run_epg_purge():
-    log("Starting EPG purge...")
-    notify("Smart EPG Fixer", "Cleaning EPG data...", 4000)
+if ADDON.getSetting('initialized') != 'true':
+    result = first_run_popup()
+    if result != -1:
+        ADDON.setSettingInt('interval_days', result)
+    ADDON.setSetting('initialized', 'true')
 
-    delete_epg_files()
-    time.sleep(2)
+run_on_start = ADDON.getSettingBool('run_on_start')
+interval_days = ADDON.getSettingInt('interval_days')
+last_run = get_last_run()
+should_run = run_on_start or (last_run is None or (datetime.datetime.now() - last_run).days >= interval_days)
+
+if should_run:
+    notify("Smart EPG Fixer running...")
+    epg_cleanup()
+    wait_for_pvr()
     run_merge()
-
-    update_last_run_time()
-    log("EPG purge complete.")
-
-def main():
-    ensure_data_folder()
-
-    if is_first_run():
-        log("First install detected — showing schedule popup.")
-        show_schedule_selector()
-        mark_first_run_complete()
-
-    run_mode = addon.getSetting("run_mode")
-
-    if run_mode == "every_startup":
-        log("Running EPG cleanup on startup.")
-        run_epg_purge()
-    else:
-        try:
-            days = int(run_mode.replace("every_", "").replace("_days", ""))
-            interval_seconds = days * 86400
-        except:
-            log("Invalid or missing run_mode, defaulting to 7 days.")
-            interval_seconds = 7 * 86400
-
-        now = time.time()
-        last_run = get_last_run_time()
-        if now - last_run >= interval_seconds:
-            log("Scheduled EPG cleanup triggered.")
-            run_epg_purge()
-        else:
-            log("EPG cleanup not due yet.")
-
-    monitor = xbmc.Monitor()
-    while not monitor.abortRequested():
-        if monitor.waitForAbort(CHECK_INTERVAL):
-            break
-        if run_mode.startswith("every_") and "days" in run_mode:
-            try:
-                days = int(run_mode.replace("every_", "").replace("_days", ""))
-                if time.time() - get_last_run_time() >= days * 86400:
-                    run_epg_purge()
-            except:
-                continue
-
-if __name__ == "__main__":
-    main()
+    set_last_run()
+    notify("EPG Fix and Merge complete.")
+else:
+    log("Skipping run — interval not met or not set.")
