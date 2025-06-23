@@ -680,6 +680,19 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
+<addon id="resource.images.skinbackgrounds.xonfluencenigelbuild" name="Skin Backgrounds Nigel Build" version="1.0" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack - Nigel Build</summary>
+		<description lang="en">Skin Backgrounds - Nigel Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
 <addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzau" name="Skin Backgrounds NZ AUS" version="5.6" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
