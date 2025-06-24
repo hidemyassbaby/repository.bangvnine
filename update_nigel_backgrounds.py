@@ -26,6 +26,12 @@ exclude_images = [
 
 # Function to delete all images except the ones in the exclude list
 def delete_images():
+    # Check if the 'resources' folder exists
+    if not os.path.isdir(image_save_path):
+        print(f"Directory {image_save_path} does not exist, creating it.")
+        os.makedirs(image_save_path)  # Create the directory if it doesn't exist
+    
+    # Now proceed with deleting the images
     for filename in os.listdir(image_save_path):
         file_path = os.path.join(image_save_path, filename)
         if os.path.isfile(file_path) and filename not in exclude_images:
