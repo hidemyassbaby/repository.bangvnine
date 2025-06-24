@@ -1,0 +1,41 @@
+name: Update Nigel Backgrounds
+
+on:
+  schedule:
+    - cron: '0 0 */2 * *'  # Every 2 days at midnight UTC
+  workflow_dispatch:  # Trigger manually if needed
+
+jobs:
+  update-backgrounds:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install required packages
+      run: |
+        pip install -r requirements.txt
+
+    - name: Download new background images and bump version
+      run: |
+        python3 update_nigel_backgrounds.py  # Ensure this Python script is in your repo
+
+    - name: Package addon into ZIP and update addons.xml
+      run: |
+        python3 create_addon_zip.py  # Run the packaging script after the version bump
+
+    - name: Commit and push changes
+      run: |
+        git config --local user.name "GitHub Actions"
+        git config --local user.email "actions@github.com"
+        git add .
+        git commit -m "Automated update: images and version bump"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub token for authentication
