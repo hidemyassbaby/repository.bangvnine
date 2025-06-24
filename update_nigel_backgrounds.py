@@ -62,6 +62,11 @@ def download_image(image_number):
 
 # Function to bump the version in addon.xml
 def bump_version():
+    # Check if the addon.xml file exists
+    if not os.path.exists(addon_xml_path):
+        print(f"Error: {addon_xml_path} does not exist!")
+        return
+
     tree = ET.parse(addon_xml_path)
     root = tree.getroot()
 
