@@ -2,42 +2,40 @@ name: Update Nigel Backgrounds
 
 on:
   schedule:
-    - cron: '0 0 */2 * *'  # Every 2 days
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 11 */2 * *'  # Every 2 days at 00:00 NZ time (11:00 UTC)
+  workflow_dispatch:
 
 jobs:
   update-backgrounds:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python 3
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
+    - name: Set up Python 3
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
 
-      - name: Install requirements
-        run: pip install -r requirements.txt
+    - name: Install dependencies
+      run: pip install -r requirements.txt
 
-      - name: Run update script (Python 3)
-        run: python3 update_nigel_backgrounds.py
+    - name: Run background update script
+      run: python3 update_nigel_backgrounds.py
 
-      - name: Install Python 2
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python2
+    - name: Set up Python 2 and run _repo_xml_generator.py
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python2
+        python2 _repo_xml_generator.py
 
-      - name: Run _repo_xml_generator.py (Python 2)
-        run: python2 _repo_xml_generator.py
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add .
-          git commit -m "Auto update Nigel backgrounds and version"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Commit and push changes
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "actions@github.com"
+        git add .
+        git commit -m "Automated background update"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
