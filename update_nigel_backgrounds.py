@@ -3,12 +3,10 @@ import requests
 import shutil
 from xml.etree import ElementTree as ET
 
-# Define paths relative to GitHub repo root
-base_path = os.path.join("resource.images.skinbackgrounds.xonfluencenigelbuild")
+base_path = "resource.images.skinbackgrounds.xonfluencenigelbuild"
 image_save_path = os.path.join(base_path, "resources")
 addon_xml_path = os.path.join(base_path, "addon.xml")
 
-# Files to exclude from deletion
 exclude_images = [
     "oranzhevyy-fon-nadpis-bang - Copy (2).jpg",
     "oranzhevyy-fon-nadpis-bang - Copy (3).jpg",
@@ -28,10 +26,8 @@ def delete_images():
     if not os.path.exists(image_save_path):
         os.makedirs(image_save_path)
     for filename in os.listdir(image_save_path):
-        file_path = os.path.join(image_save_path, filename)
-        if os.path.isfile(file_path) and filename not in exclude_images:
-            os.remove(file_path)
-            print(f"Deleted {filename}")
+        if filename not in exclude_images:
+            os.remove(os.path.join(image_save_path, filename))
 
 def download_images():
     for i in range(8):
@@ -40,7 +36,6 @@ def download_images():
         if response.status_code == 200:
             with open(os.path.join(image_save_path, f"background_{i}.jpg"), 'wb') as f:
                 shutil.copyfileobj(response.raw, f)
-            print(f"Downloaded background_{i}.jpg")
 
 def bump_version():
     tree = ET.parse(addon_xml_path)
@@ -50,13 +45,13 @@ def bump_version():
     parts[-1] = str(int(parts[-1]) + 1)
     new_version = '.'.join(parts)
     root.set('version', new_version)
-    tree.write(addon_xml_path, encoding='UTF-8', xml_declaration=True)
-    print(f"Version bumped from {old_version} to {new_version}")
+    tree.write(addon_xml_path, encoding="UTF-8", xml_declaration=True)
+    print(f"Bumped version from {old_version} to {new_version}")
 
 def main():
     delete_images()
     download_images()
     bump_version()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
