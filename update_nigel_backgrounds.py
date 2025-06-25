@@ -22,7 +22,7 @@ def delete_images():
                 os.remove(filepath)
                 print(f"Deleted {filename}")
 
-def download_picsum_images(count=5):
+def download_picsum_images(count=6):
     for i in range(count):
         url = f"https://picsum.photos/3840/2160.jpg?random={random.randint(1000, 9999)}"
         filename = f"picsum_{i}.jpg"
@@ -35,7 +35,7 @@ def download_picsum_images(count=5):
         else:
             print(f"Failed to download picsum image: {url}")
 
-def download_postimg_images(txt_path="postimg_urls.txt", count=6):
+def download_postimg_images(txt_path="postimg_urls.txt", count=7):
     if not os.path.exists(txt_path):
         print("Missing postimg_urls.txt file.")
         return
