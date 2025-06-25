@@ -1,6 +1,6 @@
 import os
-import requests
 import shutil
+import subprocess
 from xml.etree import ElementTree as ET
 
 # Paths
@@ -60,11 +60,19 @@ def cleanup_old_zips(current_version):
             os.remove(os.path.join(zip_dir, fname))
             print(f"Deleted old zip: {fname}")
 
+def run_repo_generator():
+    script = "repo_xml_generator_py3.py"
+    if os.path.exists(script):
+        subprocess.run(["python3", script], check=True)
+        print("Ran repo_xml_generator_py3.py")
+
 def main():
     delete_images()
     download_images()
     new_version = bump_version()
     cleanup_old_zips(new_version)
+    run_repo_generator()
 
 if __name__ == "__main__":
+    import requests
     main()

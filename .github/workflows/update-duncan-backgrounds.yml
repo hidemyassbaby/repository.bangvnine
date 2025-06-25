@@ -2,7 +2,7 @@ name: Update Duncan Backgrounds
 
 on:
   schedule:
-    - cron: '0 12 */3 * *'  # Every 3 days at 12:00 UTC (midnight NZST)
+    - cron: '0 12 */3 * *'  # Every 3 days at midnight NZ time (12:00 UTC)
   workflow_dispatch:
 
 jobs:
