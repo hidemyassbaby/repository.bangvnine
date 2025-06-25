@@ -10,6 +10,7 @@ image_save_path = os.path.join(base_path, "resources")
 addon_xml_path = os.path.join(base_path, "addon.xml")
 zip_dir = os.path.join("zips", addon_id)
 
+# Exclude images a.jpg to k.jpg from deletion
 exclude_images = [f"{chr(c)}.jpg" for c in range(ord("a"), ord("k") + 1)]
 
 def delete_images():
@@ -22,7 +23,7 @@ def delete_images():
                 os.remove(filepath)
                 print(f"Deleted {filename}")
 
-def download_picsum_images(count=6):
+def download_picsum_images(count=5):
     for i in range(count):
         url = f"https://picsum.photos/3840/2160.jpg?random={random.randint(1000, 9999)}"
         filename = f"picsum_{i}.jpg"
@@ -31,11 +32,11 @@ def download_picsum_images(count=6):
         if response.status_code == 200:
             with open(filepath, "wb") as f:
                 shutil.copyfileobj(response.raw, f)
-            print(f"Downloaded picsum image: {filename}")
+            print(f"Downloaded Picsum: {filename}")
         else:
-            print(f"Failed to download picsum image: {url}")
+            print(f"Failed to download {url}")
 
-def download_postimg_images(txt_path="postimg_urls.txt", count=7):
+def download_postimg_images(txt_path="postimg_urls.txt", count=6):
     if not os.path.exists(txt_path):
         print("Missing postimg_urls.txt file.")
         return
@@ -51,9 +52,9 @@ def download_postimg_images(txt_path="postimg_urls.txt", count=7):
             if response.status_code == 200:
                 with open(filepath, "wb") as f:
                     shutil.copyfileobj(response.raw, f)
-                print(f"Downloaded postimg: {filename}")
+                print(f"Downloaded Postimg: {filename}")
             else:
-                print(f"Failed to download postimg: {url}")
+                print(f"Failed: {url}")
         except Exception as e:
             print(f"Error downloading {url}: {e}")
 
@@ -83,6 +84,12 @@ def main():
     download_picsum_images()
     download_postimg_images()
     new_version = bump_version()
+
+    # Generate new zip and addons.xml/md5
+    print("Running repo_xml_generator_py3.py...")
+    os.system("python repo_xml_generator_py3.py")
+
+    # Remove old zips
     cleanup_old_zips(new_version)
 
 if __name__ == "__main__":
