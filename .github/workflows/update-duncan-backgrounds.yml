@@ -1,0 +1,33 @@
+name: Update Duncan Backgrounds
+
+on:
+  schedule:
+    - cron: '0 12 */3 * *'  # Every 3 days at 12:00 UTC (midnight NZST)
+  workflow_dispatch:
+
+jobs:
+  update-duncan-backgrounds:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run update_duncan_backgrounds.py
+        run: python update_duncan_backgrounds.py
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Auto: Update Duncan backgrounds and bump version"
+          git push
