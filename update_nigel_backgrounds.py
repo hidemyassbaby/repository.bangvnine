@@ -1,30 +1,16 @@
 import os
+import random
 import requests
 import shutil
 from xml.etree import ElementTree as ET
 
-# Paths
 addon_id = "resource.images.skinbackgrounds.xonfluencenigelbuild"
 base_path = os.path.join(addon_id)
 image_save_path = os.path.join(base_path, "resources")
 addon_xml_path = os.path.join(base_path, "addon.xml")
 zip_dir = os.path.join("zips", addon_id)
 
-# Images to keep
-exclude_images = [
-    "oranzhevyy-fon-nadpis-bang - Copy (2).jpg",
-    "oranzhevyy-fon-nadpis-bang - Copy (3).jpg",
-    "oranzhevyy-fon-nadpis-bang.jpg",
-    "bang-bang-wallpaper-2 - Copy (2).jpg",
-    "bang-bang-wallpaper-2 - Copy.jpg",
-    "bang-bang-wallpaper-2.jpg",
-    "122579146_3542275872526363_5780681884022639449_n.jpg",
-    "IMG_7287.jpg",
-    "121117_wo.jpg",
-    "506021828_1299884798806613_5533992735717483610_n.jpg",
-    "QGr5cwa - Imgur.jpg",
-    "WZFR5LSQQFC35OWXBZMGWVC6MY.jpg"
-]
+exclude_images = [f"{chr(c)}.jpg" for c in range(ord("a"), ord("k") + 1)]
 
 def delete_images():
     if not os.path.exists(image_save_path):
@@ -36,18 +22,40 @@ def delete_images():
                 os.remove(filepath)
                 print(f"Deleted {filename}")
 
-def download_images():
-    for i in range(8):
-        url = f"https://picsum.photos/3840/2160.jpg?random={i}"
+def download_picsum_images(count=5):
+    for i in range(count):
+        url = f"https://picsum.photos/3840/2160.jpg?random={random.randint(1000, 9999)}"
+        filename = f"picsum_{i}.jpg"
+        filepath = os.path.join(image_save_path, filename)
         response = requests.get(url, stream=True)
         if response.status_code == 200:
-            filename = f"background_{i}.jpg"
-            filepath = os.path.join(image_save_path, filename)
-            with open(filepath, 'wb') as f:
+            with open(filepath, "wb") as f:
                 shutil.copyfileobj(response.raw, f)
-            print(f"Downloaded {filename}")
+            print(f"Downloaded picsum image: {filename}")
         else:
-            print(f"Failed to download image {i}")
+            print(f"Failed to download picsum image: {url}")
+
+def download_postimg_images(txt_path="postimg_urls.txt", count=6):
+    if not os.path.exists(txt_path):
+        print("Missing postimg_urls.txt file.")
+        return
+    with open(txt_path, "r") as f:
+        urls = [line.strip() for line in f if line.strip()]
+    selected = random.sample(urls, min(count, len(urls)))
+    for i, url in enumerate(selected):
+        ext = os.path.splitext(url)[-1].split("?")[0]
+        filename = f"postimg_{i}{ext}"
+        filepath = os.path.join(image_save_path, filename)
+        try:
+            response = requests.get(url, stream=True)
+            if response.status_code == 200:
+                with open(filepath, "wb") as f:
+                    shutil.copyfileobj(response.raw, f)
+                print(f"Downloaded postimg: {filename}")
+            else:
+                print(f"Failed to download postimg: {url}")
+        except Exception as e:
+            print(f"Error downloading {url}: {e}")
 
 def bump_version():
     tree = ET.parse(addon_xml_path)
@@ -58,7 +66,7 @@ def bump_version():
     new_version = ".".join(parts)
     root.set("version", new_version)
     tree.write(addon_xml_path, encoding="UTF-8", xml_declaration=True)
-    print(f"Bumped version: {old_version} → {new_version}")
+    print(f"Version bumped: {old_version} → {new_version}")
     return new_version
 
 def cleanup_old_zips(current_version):
@@ -72,7 +80,8 @@ def cleanup_old_zips(current_version):
 
 def main():
     delete_images()
-    download_images()
+    download_picsum_images()
+    download_postimg_images()
     new_version = bump_version()
     cleanup_old_zips(new_version)
 
