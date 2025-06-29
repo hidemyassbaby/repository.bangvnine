@@ -1,0 +1,14 @@
+<addon id="plugin.video.rugbyreplays" version="1.0.0" name="Rugby Replays"
+       provider-name="Bang">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+    </requires>
+    <extension point="xbmc.python.pluginsource" library="default.py">
+        <provides>video</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary>Watch full rugby game replays</summary>
+        <description>Plays replays from rugby24.net</description>
+        <platform>all</platform>
+    </extension>
+</addon>
