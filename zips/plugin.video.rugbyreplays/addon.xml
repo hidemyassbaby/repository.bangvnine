@@ -1,4 +1,4 @@
-<addon id="plugin.video.rugbyreplays" version="1.0.0" name="Rugby Replays"
+<addon id="plugin.video.rugbyreplays" version="1.1" name="Rugby Replays"
        provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
