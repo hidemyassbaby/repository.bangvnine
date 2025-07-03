@@ -1,0 +1,38 @@
+name: Update Wayne Backgrounds
+
+on:
+  schedule:
+    - cron: '0 11 */2 * *'  # Every 2 days at midnight NZ time (11:00 UTC)
+  workflow_dispatch:
+
+jobs:
+  update-backgrounds:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python 3
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run background update script
+      run: python3 update_nigel_backgrounds.py
+
+    - name: Run repo XML generator script
+      run: python3 repo_xml_generator_py3.py
+
+    - name: Commit and push changes
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "actions@github.com"
+        git add .
+        git commit -m "Automated background update"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
