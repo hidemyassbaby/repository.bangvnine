@@ -22,7 +22,7 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Run background update script
-      run: python3 update_nigel_backgrounds.py
+      run: python3 update_wayne_backgrounds.py
 
     - name: Run repo XML generator script
       run: python3 repo_xml_generator_py3.py
