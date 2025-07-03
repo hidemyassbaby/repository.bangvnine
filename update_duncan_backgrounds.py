@@ -23,7 +23,7 @@ def delete_images():
                 os.remove(filepath)
                 print(f"Deleted {filename}")
 
-def download_picsum_images(count=7):
+def download_picsum_images(count=6):
     for i in range(count):
         url = f"https://picsum.photos/3840/2160.jpg?random={random.randint(1000, 9999)}"
         filename = f"picsum_{i}.jpg"
