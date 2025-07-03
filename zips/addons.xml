@@ -366,7 +366,7 @@ You can expect all that and more coming at you in 3 top-quality videos every sin
   </extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.11" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.12" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
