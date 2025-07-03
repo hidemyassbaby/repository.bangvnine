@@ -247,7 +247,7 @@ You can expect all that and more coming at you in 3 top-quality videos every sin
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.9" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.10" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
