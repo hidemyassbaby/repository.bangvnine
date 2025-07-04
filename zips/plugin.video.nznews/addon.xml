@@ -1,5 +1,5 @@
 <addon id="plugin.video.nznews"
-       version="1.0.0"
+       version="1.1"
        name="NZ News"
        provider-name="yourname">
   <requires>
