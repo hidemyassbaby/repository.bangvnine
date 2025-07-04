@@ -1,0 +1,27 @@
+name: Update RSS News
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update-addon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: pip install feedparser requests beautifulsoup4
+
+      - name: Fetch Latest Articles
+        run: |
+          python3 .github/scripts/scrape_and_update.py
+
+      - name: Commit Changes
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'actions@github.com'
+          git add .
+          git commit -m "Automated news update"
+          git push

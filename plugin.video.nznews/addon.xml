@@ -1,0 +1,14 @@
+<addon id="plugin.video.nznews"
+       version="1.0.0"
+       name="NZ News"
+       provider-name="yourname">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py"/>
+  <extension point="xbmc.addon.metadata">
+    <summary>Live NZ news from RNZ, Stuff, and ODT</summary>
+    <description>Scrapes full articles from trusted New Zealand news feeds</description>
+    <platform>all</platform>
+  </extension>
+</addon>
