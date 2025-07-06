@@ -1,0 +1,32 @@
+name: Mirror Kodi Repo to tdbnz-coding (Preserve All Zips)
+
+on:
+  push:
+    branches:
+      - main  # or your default branch
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+
+      - name: Clone mirror repo (tdbnz-coding)
+        run: |
+          git clone https://tdbnz-coding:${{ secrets.MIRROR_PAT }}@github.com/tdbnz-coding/repository.bangvnine-mirror.git mirror
+
+      - name: Copy all files without deleting anything in mirror
+        run: |
+          rsync -a --ignore-existing ./ mirror/
+          rsync -a --update ./ mirror/
+
+      - name: Commit and push changes if needed
+        working-directory: mirror
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "Mirror update on $(date)"
+          git push origin main
