@@ -41,39 +41,39 @@ def main_menu():
     
     all_d=[]
     aa=addDir3( 'Search', 'www',201,BASE_LOGO+'search.png',all_fanarts['32034'],'Search')
-     
-     #place your Jen playlist here:
-    #dulpicate this line with your address
-    aa=addDir3('One Click Media','https://thechains24.com/ABSOLUTION/ONECLICK%20MAIN.txt',189,'https://i.imgur.com/20o9y36.png','https://i.imgur.com/9mM9udd.png','One Click Media')   
     all_d.append(aa)
      #place your Jen playlist here:
     #dulpicate this line with your address
-    #aa=addDir3('Chain Reaction','https://thechains24.com/ONE%20CLICK%20CHAINS/MAIN%20DIR.txt',189,'https://i.imgur.com/c8OKdDM.png','https://i.imgur.com/GqkMiYJ.png','Chain Reaction')
+    aa=addDir3('NZ TV Shows','https://raw.githubusercontent.com/hidemyassbaby/Menu/refs/heads/main/Kiwi%20Time%20Capsule/Menu/NZ%20TV%20Shows/Menu/nztvshows%20mainmenu.txt',189,'https://i.postimg.cc/Wzshyt9N/Chat-GPT-Image-Jul-7-2025-08-46-46-PM.png','https://i.postimg.cc/Wzshyt9N/Chat-GPT-Image-Jul-7-2025-08-46-46-PM.png','NZ TV Shows')   
     all_d.append(aa)
-    #place your Jen playlist here:
+     #place your Jen playlist here:
     #dulpicate this line with your address
-    #aa=addDir3('House Of Horrors','http://thechains24.com/THE%20CRYPT/HORROR%20MAIN.txt',189,'https://i.imgur.com/3BWDbmX.png','https://i.imgur.com/eAZ7tuT.jpeg','House Of Horrors')
-    all_d.append(aa)
-    #place your Jen playlist here:
-    #dulpicate this line with your address
-    #aa=addDir3('Retrowave','http://thechains24.com/broken%20chains/RETROWAVE/MAIN%20DIR.txt',189,'https://i.imgur.com/XtUq6r7.png','https://i.imgur.com/zySh89g.png','Retrowave')
-    all_d.append(aa)
-    #place your Jen playlist here:
-    #dulpicate this line with your address
-    #aa=addDir3('Enterprise','https://thechains24.com/HAZMATS/HAZMATS.xml',189,'https://thechains24.com/HAZMATS/Untitled.png','https://thechains24.com/HAZMATS/fanart.jpg','Enterprise')
-    all_d.append(aa)
-    #place your Jen playlist here:
-    #dulpicate this line with your address
-    #aa=addDir3('Crimewave','https://thechains24.com/CRIME%20LOCKER/CRIME%20VAULT.txt',189,'https://i.imgur.com/V7RFEbq.png','https://i.imgur.com/eP3cP4H.jpeg','Crimewave')
-    all_d.append(aa)
-    #place your Jen playlist here:
-    #dulpicate this line with your address
-    #aa=addDir3('Science Fiction','http://thechains24.com/SCIENCE%20FICTION/MAIN%20DIR.txt',189,'https://i.imgur.com/uj3q9AF.png','https://i.imgur.com/ot687fb.png','Science Fiction')
-    all_d.append(aa)
-    #place your Jen playlist here:
-    #dulpicate this line with your address
-    #aa=addDir3('Siren','https://thechains24.com/SIREN/Siren%20TMDB%20lists.txt',189,'https://i.imgur.com/iMqdpf8.png','https://thechains24.com/SIREN/sirenfanart.jpeg','Siren')
-    all_d.append(aa)
+    # aa=addDir3('Chain Reaction','https://thechains24.com/ONE%20CLICK%20CHAINS/MAIN%20DIR.txt',189,'https://i.imgur.com/c8OKdDM.png','https://i.imgur.com/GqkMiYJ.png','Chain Reaction')
+    # all_d.append(aa)
+    # #place your Jen playlist here:
+    # #dulpicate this line with your address
+    # aa=addDir3('House Of Horrors','http://thechains24.com/THE%20CRYPT/HORROR%20MAIN.txt',189,'https://i.imgur.com/3BWDbmX.png','https://i.imgur.com/eAZ7tuT.jpeg','House Of Horrors')
+    # all_d.append(aa)
+    # #place your Jen playlist here:
+    # #dulpicate this line with your address
+    # aa=addDir3('Retrowave','http://thechains24.com/broken%20chains/RETROWAVE/MAIN%20DIR.txt',189,'https://i.imgur.com/XtUq6r7.png','https://i.imgur.com/zySh89g.png','Retrowave')
+    # all_d.append(aa)
+    # #place your Jen playlist here:
+    # #dulpicate this line with your address
+    # aa=addDir3('Enterprise','https://thechains24.com/HAZMATS/HAZMATS.xml',189,'https://thechains24.com/HAZMATS/Untitled.png','https://thechains24.com/HAZMATS/fanart.jpg','Enterprise')
+    # all_d.append(aa)
+    # #place your Jen playlist here:
+    # #dulpicate this line with your address
+    # aa=addDir3('Crimewave','https://thechains24.com/CRIME%20LOCKER/CRIME%20VAULT.txt',189,'https://i.imgur.com/V7RFEbq.png','https://i.imgur.com/eP3cP4H.jpeg','Crimewave')
+    # all_d.append(aa)
+    # #place your Jen playlist here:
+    # #dulpicate this line with your address
+    # aa=addDir3('Science Fiction','http://thechains24.com/SCIENCE%20FICTION/MAIN%20DIR.txt',189,'https://i.imgur.com/uj3q9AF.png','https://i.imgur.com/ot687fb.png','Science Fiction')
+    # all_d.append(aa)
+    # #place your Jen playlist here:
+    # #dulpicate this line with your address
+    # aa=addDir3('Siren','https://thechains24.com/SIREN/Siren%20TMDB%20lists.txt',189,'https://i.imgur.com/iMqdpf8.png','https://thechains24.com/SIREN/sirenfanart.jpeg','Siren')
+    # all_d.append(aa)
     if Addon.getSetting('settings')=='true':
         aa=addNolink( Addon.getLocalizedString(32029), 'www',151,False,fanart=all_fanarts['32029'], iconimage=BASE_LOGO+'setting.png',plot='',dont_place=True)
     all_d.append(aa)
