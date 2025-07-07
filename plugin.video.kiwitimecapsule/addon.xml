@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.kiwitimecapsule"                                                                                                                                    
+	   name="Kiwi Time Capsule"                                                 
+	   version="1.0"                                                                                                                                        
+	   provider-name="Bang">
+  <requires>
+	<import addon="script.module.requests"/> 
+  </requires>
+  <extension point="xbmc.python.pluginsource"
+            library="default.py">
+        <provides>video</provides>
+  </extension>
+  <extension library="resources/modules/" point="xbmc.python.module" />
+  <extension library="resources/sources/" point="xbmc.python.module" />
+  <extension library="resources/" point="xbmc.python.module" />
+  <extension point="xbmc.addon.metadata">
+	<reuselanguageinvoker>true</reuselanguageinvoker>
+    <summary lang="en">Kiwi Time Capsule</summary>
+    <description lang="en">Kiwi Time Capsule is your gateway to New Zealand’s screen history and fresh local gems. Dive into a curated collection of classic Kiwi TV shows, documentaries, and films, alongside a growing selection of modern Aotearoa cinema and series. Whether you're revisiting the past or discovering new favourites, this add-on brings together the best of NZ storytelling, all in one place.</description>
+	
+    <platform>all</platform>
+	<assets>
+            <icon>icon.png</icon>
+    </assets>
+  </extension>
+  
+</addon>
