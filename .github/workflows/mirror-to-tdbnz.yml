@@ -1,9 +1,9 @@
-name: Mirror Kodi Repo to tdbnz-coding (Preserve All Zips)
+name: Mirror Kodi Repo to tdbnz-coding (Preserve All Zips, No Workflows)
 
 on:
   push:
     branches:
-      - main  # or your default branch
+      - main
 
 jobs:
   mirror:
@@ -15,12 +15,12 @@ jobs:
 
       - name: Clone mirror repo (tdbnz-coding)
         run: |
-          git clone https://tdbnz-coding:${{ secrets.MIRROR_PAT }}@github.com/tdbnz-coding/repository.bangvnine-mirror.git mirror
+          git clone https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/tdbnz-coding/repository.bangvnine-mirror.git mirror
 
-      - name: Copy all files without deleting anything in mirror
+      - name: Copy all files except workflows
         run: |
-          rsync -a --ignore-existing ./ mirror/
-          rsync -a --update ./ mirror/
+          rsync -a --exclude='.github/workflows' --ignore-existing ./ mirror/
+          rsync -a --exclude='.github/workflows' --update ./ mirror/
 
       - name: Commit and push changes if needed
         working-directory: mirror
