@@ -2,8 +2,8 @@
     
     <!-- initial settings  -->
     <category label="Home Page">
-        <setting id="root_xml" type="text" label="Root XML Location" option="hidden" default="file://main.xml" visible="true"/>
-        <setting id="message_xml_url" type="text" label="News File Location" option="hidden" default="file://news.xml" visible="true"/>
+        <setting id="root_xml" type="text" label="Root XML Location" option="hidden" default="https://raw.githubusercontent.com/hidemyassbaby/Menu/refs/heads/main/Kiwi%20Time%20Capsule/Menu/Main%20Menu%20for%20addon.xml" visible="false"/>
+        <setting id="message_xml_url" type="text" label="News File Location" option="hidden" default="file://news.xml" visible="false"/>
     </category>
     
     <!-- Dev Mode - future features for playlisters and developers -->

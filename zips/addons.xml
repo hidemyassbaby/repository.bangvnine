@@ -362,7 +362,7 @@ You can expect all that and more coming at you in 3 top-quality videos every sin
     </extension>
 </addon>
 
-<addon id="plugin.video.kiwitimecapsule" name="Kiwi Time Capsule" version="2.0" provider-name="Bang">
+<addon id="plugin.video.kiwitimecapsule" name="Kiwi Time Capsule" version="2.1" provider-name="Bang">
   <requires>
     <import addon="xbmc.python" version="3.0.0" />
     <import addon="script.module.requests" />
