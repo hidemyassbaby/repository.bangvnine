@@ -28,7 +28,7 @@ class source:
     def __init__(self):
         self.priority = 1
         self.language = ['en']
-        self.domains = ['torrentquest.com']
+        self.domains = ['torrentquest.com', 'torrentdownload']
         self.base_link = 'https://www.magnetdl.com'
         self.search_link = '/{0}/{1}'
 

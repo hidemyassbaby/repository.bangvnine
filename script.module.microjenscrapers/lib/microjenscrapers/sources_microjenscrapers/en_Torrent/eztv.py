@@ -20,7 +20,7 @@ class source:
     def __init__(self):
         self.priority = 1
         self.language = ['en']
-        self.domains = ['eztv.re', 'eztv.ag', 'eztv.it', 'eztv.ch', 'eztv.tf', 'eztv.yt', 'eztv.unblockit.dev']
+        self.domains = ['eztv.re', 'eztv.ag', 'eztv.it', 'eztv.ch', 'eztv.tf', 'eztv.yt', 'eztv.unblockit.dev', 'eztvx.to']
         self._base_link = None
         self.search_link = '/search/%s'
 
