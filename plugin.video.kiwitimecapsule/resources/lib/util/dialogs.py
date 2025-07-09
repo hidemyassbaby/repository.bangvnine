@@ -2,7 +2,12 @@ import xbmcgui
 hide_link = True
 
 def link_dialog(links):
-    if len(links) == 1: return links[0]
+    if len(links) == 1:
+        link = links[0]
+        if "(" in link and link.endswith(")"):
+            split = link.split('(')
+            link = split[0]
+        return link
     options = []
     for i, link in enumerate(links):
         if "(" in link and link.endswith(")"):

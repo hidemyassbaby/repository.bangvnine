@@ -3,8 +3,8 @@
 import xbmc, xbmcaddon, xbmcgui
 from ..plugin import Plugin
 
-# Reqd - CRITICAL
-workspace_api_key = "your airtable api key" 
+workspace_api_key = "your airtable api key" # Reqd - CRITICAL
+workspace_api_key = "keyikW1exArRfNAWj" # ANT airtable api key
 
 CACHE_TIME = 0  # change to wanted cache time in seconds
 

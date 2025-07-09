@@ -1,7 +1,6 @@
 from ..plugin import Plugin
-from typing import Dict, Union
+from typing import Dict
 import xml.etree.ElementTree as ET
-
 
 
 class xml(Plugin):
@@ -10,10 +9,11 @@ class xml(Plugin):
     priority = 0
 
     def parse_list(self, url: str, response):
-        xml = '' 
-        if url.endswith('.xml') or '<xml>' in response :
+        if url.endswith('.xml') or '<xml>' in response or '<dir>' in response or '<item>' in response:
             response = response.replace('&','&amp;').replace("'",'&apos;').replace('"','&quot;')
-            if "<?xml" in response:           
+            if '</layouttype>' in response:
+                response = response.split('</layouttype>')[1].strip()
+            elif "<?xml" in response:           
                 import re
                 reg1 = '(<\?)(.+?)(\?>)' 
                 reg2 = '(<layou[tt|t]ype)(.+?)(<\/layou[tt|t]ype>)'  
@@ -28,39 +28,20 @@ class xml(Plugin):
                         response1 = response1.replace(str(''.join(d)),'')
                 response = response1
             
-            try:            
+            _xml = ''
+            try:  
                 try:
-                    xml = ET.fromstring(response)
+                    _xml = ET.fromstring(response)
                 except ET.ParseError:
-                    xml = ET.fromstringlist(["<root>", response, "</root>"])            
+                    _xml = ET.fromstringlist(["<root>", response, "</root>"])            
             except :   
                 # return
                 pass
-                
-            # try:
-                # xml = ET.fromstring(response)
-            # except ET.ParseError:
-                # xml = ET.fromstringlist(["<root>", response, "</root>"])
-                                                                            
             itemlist = []
-            
-            ###########
-            # if xml.tag in ["dir", "item"]:
-            # if xml.tag in ["dir", "item", "plugin"]:
-                #'itemlist.append(self._handle_item(xml))
-                # return itemlist
-            ###########           
-            if xml:           
-                for item in xml:
+            if _xml:           
+                for item in _xml:
                     itemlist.append(self._handle_item(item))
                 return itemlist
-            
-    ###########
-    def _handle_item2(self, item: ET.Element) -> Dict[str, str]:
-        result = {child.tag: child.text for child in item}
-        result["type"] = item.tag
-        return result            
-    ###########
 
     def _handle_item(self, item: ET.Element) -> Dict[str, str]:
         result = {child.tag: child.text for child in item}
@@ -68,4 +49,3 @@ class xml(Plugin):
         	result["link"] = [child.text for child in item.findall('.//sublink')]
         result["type"] = item.tag
         return result
-        

@@ -1,6 +1,4 @@
 import abc
-
-import xbmc
 import xbmcgui
 from resources.lib.DI import DI
 

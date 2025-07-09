@@ -22,6 +22,7 @@ class mpd_play_video(Plugin):
     priority = 10
 
     def play_video(self, item):
+        if not '"link":' in str(item) : return False
         item = json.loads(item)
         link = item["link"]
         title = item["title"]
