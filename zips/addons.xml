@@ -25,7 +25,7 @@
     </extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.35" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.36" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
