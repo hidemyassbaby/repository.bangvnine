@@ -38,7 +38,7 @@
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.17" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.18" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
