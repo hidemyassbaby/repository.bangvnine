@@ -272,7 +272,7 @@ In addition to what livestreams allowed you to do, you can now,
     </extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.39" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.40" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
