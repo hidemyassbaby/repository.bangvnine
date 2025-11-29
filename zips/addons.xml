@@ -319,7 +319,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.89" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.90" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
