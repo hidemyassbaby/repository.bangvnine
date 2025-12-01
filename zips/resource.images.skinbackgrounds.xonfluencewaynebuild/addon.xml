@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.90" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.91" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
