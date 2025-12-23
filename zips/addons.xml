@@ -207,7 +207,7 @@
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencenigelbuild" name="Skin Backgrounds Nigel Build" version="1.104" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencenigelbuild" name="Skin Backgrounds Nigel Build" version="1.105" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
