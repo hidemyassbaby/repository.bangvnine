@@ -1,9 +1,13 @@
 <settings>
-    <category label="IPTV Settings">
-        <setting id="use_m3u_mode" type="bool" label="Use M3U Mode Instead of API" default="true" />
-        <setting id="server_url" type="text" label="Xtream Server URL" />
-        <setting id="username" type="text" label="Username" />
-        <setting id="password" type="text" label="Password" option="hidden" />
+  <category label="IPTV Settings">
 
-    </category>
+    <setting id="use_paid_login" type="bool" label="Use Paid Login (enter your own details)" default="false" />
+    <setting id="username" type="text" label="Username (paid login only)" />
+    <setting id="password" type="text" label="Password (paid login only)" option="hidden" />
+
+    <setting id="show_account_status" type="bool" label="Show account type (Free or Paid) on main menu" default="true" />
+
+    <setting id="first_run_done" type="bool" default="false" visible="false" />
+
+  </category>
 </settings>

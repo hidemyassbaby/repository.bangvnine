@@ -1,0 +1,46 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en_GB\n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgctxt "#30000"
+msgid "Media4u TV"
+msgstr "Media4u TV"
+
+msgctxt "#30010"
+msgid "Login"
+msgstr "Login"
+
+msgctxt "#30011"
+msgid "Use paid login"
+msgstr "Use paid login"
+
+msgctxt "#30012"
+msgid "Server URL"
+msgstr "Server URL"
+
+msgctxt "#30013"
+msgid "Username"
+msgstr "Username"
+
+msgctxt "#30014"
+msgid "Password"
+msgstr "Password"
+
+msgctxt "#30015"
+msgid "First run done"
+msgstr "First run done"
+
+msgctxt "#30020"
+msgid "Playback and browsing"
+msgstr "Playback and browsing"
+
+msgctxt "#30021"
+msgid "Use M3U mode (recommended)"
+msgstr "Use M3U mode (recommended)"
+
+msgctxt "#30022"
+msgid "Cache expiry (seconds)"
+msgstr "Cache expiry (seconds)"

@@ -1,4 +1,25 @@
- v4.2.0 (23 March 2025)
+v4.3.0 (17 January 2026)
+
+This update focuses on stability, simplicity, and a cleaner user experience, based on real-world usage.
+
+Key Changes:
+
+Server URL Has been updated
+
+Added a Settings entry at the bottom of the main menu for quick access.
+
+New optional Account Status display on the main menu:
+
+Shows whether the user is on Free Access or Paid Login.
+
+Clicking the status opens Settings, allowing users to update login details easily.
+
+Improved first-run flow to guide users cleanly into Free or Paid access without confusion.
+
+Overall UI cleanup to reduce clutter and make the addon feel more polished and consumer-friendly.
+
+
+v4.2.0 (23 March 2025)
 This is a major quality-of-life update that brings more flexibility, stability, and compatibility.
 
 Key Improvements:
