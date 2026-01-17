@@ -1,22 +1,24 @@
-v4.3.0 (17 January 2026)
+v4.4.0 (17 January 2026)
 
-This update focuses on stability, simplicity, and a cleaner user experience, based on real-world usage.
+This release focuses on stability, simplicity, and a cleaner user experience, based on real-world usage and feedback.
 
-Key Changes:
+Key updates:
 
-Server URL Has been updated
+Server URL has been updated to ensure reliable connectivity.
 
-Added a Settings entry at the bottom of the main menu for quick access.
+Added support for channel favorites. Channels can now be added or removed by right clicking.
 
-New optional Account Status display on the main menu:
+A Settings option has been added to the bottom of the main menu for quicker access.
 
-Shows whether the user is on Free Access or Paid Login.
+Optional Account Status display on the main menu:
 
-Clicking the status opens Settings, allowing users to update login details easily.
+Shows whether the addon is using Free Access or a Paid Login.
 
-Improved first-run flow to guide users cleanly into Free or Paid access without confusion.
+Selecting the status opens Settings, allowing login details to be updated easily.
 
-Overall UI cleanup to reduce clutter and make the addon feel more polished and consumer-friendly.
+Improved first-run experience, clearly guiding users to choose between Free Access and Paid Login.
+
+General UI cleanup to reduce clutter and provide a more polished, consumer-friendly feel.
 
 
 v4.2.0 (23 March 2025)
