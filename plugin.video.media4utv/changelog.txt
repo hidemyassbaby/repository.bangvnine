@@ -1,10 +1,37 @@
-Version 4.5.0
-- Updated for Kodi 21 and Kodi 22 Python 3 compatibility.
-- Added real search across Live TV, Movies, and Series.
-- Added Recently Added Movies menu.
-- Added Tools menu with account status, connection test, clear cache, and clear favourites.
-- Added 10 minute API cache to make menus faster and reduce repeated server calls.
-- Improved favourites handling and context menu actions.
-- Improved error handling for timeouts, bad JSON, and failed server responses.
-- Improved artwork and video metadata handling.
-- Removed missing fanart reference from addon.xml to avoid packaging warnings.
+v4.5.4
+
+- Added Kodi v21 & v22 support
+- Rebuilt search system
+- Added partial search matching
+- Added Search Everything
+- Added Live TV, Movies & Series search
+- Improved loading speed
+- Improved stream reliability
+- Improved API handling
+- Added cache tools
+- Added connection tools
+- Improved backend performance
+- Improved Python 3 compatibility
+- Better handling of large channel lists
+- General stability improvements
+
+
+
+4.5.3
+- Fixed Python SyntaxError in search text normalizer.
+- Verified default.py compiles before packaging.
+
+4.5.2
+- Fixed Search menu items so Kodi v21/v22 actually opens the search route.
+- Search now loads full Live TV, Movies, and Series lists from the API and filters locally.
+- Better partial matching for channel names such as Sky Sport 1.
+
+4.5.1
+- Fixed search showing no results on some Kodi/API responses.
+- Search now checks name, title, plot, description, genre, cast, year, category and nested info fields.
+- Added Search Everything, Search Live TV, Search Movies, and Search Series.
+- Search bypasses stale API cache so new results appear straight away.
+
+4.5.0
+- Kodi 21 and Kodi 22 compatibility update.
+- Added favourites, tools, account status, connection test, cache clear, and recently added movies.

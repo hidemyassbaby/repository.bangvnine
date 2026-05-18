@@ -458,7 +458,7 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="plugin.video.media4utv" name="Media4u TV" version="4.5.0" provider-name="Bang">
+<addon id="plugin.video.media4utv" name="Media4u TV" version="4.5.4" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests"/>
@@ -470,7 +470,7 @@ In addition to what livestreams allowed you to do, you can now,
 
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Media4u TV for Kodi</summary>
-        <description lang="en_GB">Live TV, & Movies works on Kodi 21 and Kodi 22.</description>
+        <description lang="en_GB">Live TV, Movies & TV Shows</description>
         <platform>all</platform>
         <language>en_GB</language>
         <license>GPL-2.0-or-later</license>

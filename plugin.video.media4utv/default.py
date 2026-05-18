@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Media4u TV Kodi plugin
-Version 4.5.0
+Version 4.5.2
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -33,7 +33,7 @@ FREE_PASS = "media4u"
 FIRST_RUN_KEY = "first_run_done"
 
 HEADERS = {
-    "User-Agent": "Kodi Media4uTV/4.5.0",
+    "User-Agent": "Kodi Media4uTV/4.5.2",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -424,42 +424,117 @@ def favourites_menu() -> None:
     xbmcplugin.endOfDirectory(HANDLE)
 
 
-def search_menu() -> None:
+def normalize_text(value: Any) -> str:
+    text = str(value or "").lower()
+    # Keep matching simple and reliable for channel names like
+    # "Sky Sport 1", "SKY Sports News", "Sky-Sport-Select".
+    for char in "._-:/\\|()[]{}+,&'\"":
+        text = text.replace(char, " ")
+    return " ".join(text.split())
+
+
+def item_search_text(item: Dict[str, Any]) -> str:
+    parts: List[str] = []
+    keys = (
+        "name", "title", "category_name", "plot", "description", "year",
+        "releaseDate", "director", "cast", "genre", "rating", "tmdb_id",
+        "stream_id", "series_id", "num", "container_extension"
+    )
+    for key in keys:
+        value = item.get(key)
+        if value not in (None, ""):
+            parts.append(str(value))
+    info = item.get("info")
+    if isinstance(info, dict):
+        for value in info.values():
+            if isinstance(value, (str, int, float)) and value not in (None, ""):
+                parts.append(str(value))
+    return normalize_text(" ".join(parts))
+
+
+def matches_term(item: Dict[str, Any], term: str) -> bool:
+    query = normalize_text(term)
+    words = [w for w in query.split() if w]
+    if not words:
+        return False
+    text = item_search_text(item)
+    # Exact phrase first, then all words anywhere. This makes
+    # "sky sport" match "Sky Sport 1" and related channel names.
+    return query in text or all(word in text for word in words)
+
+
+def add_search_result(label: str, kind: str, item: Dict[str, Any], user: str, pwd: str) -> bool:
+    raw_name = item.get("name") or item.get("title") or "Unknown"
+    name = f"{label}: {raw_name}"
+    icon = item.get("stream_icon") or item.get("cover") or item.get("cover_big") or ""
+    plot = item.get("plot") or item.get("description") or ""
+    year = item.get("year") or item.get("releaseDate") or None
+    if kind == "live" and item.get("stream_id") is not None:
+        add_playable(name, f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{item.get('stream_id')}.ts", icon, plot, year)
+        return True
+    if kind == "vod" and item.get("stream_id") is not None:
+        ext = item.get("container_extension") or "mp4"
+        add_playable(name, f"{SERVER}/movie/{quote(user)}/{quote(pwd)}/{item.get('stream_id')}.{ext}", icon, plot, year)
+        return True
+    if kind == "series" and item.get("series_id"):
+        li = xbmcgui.ListItem(label=name)
+        set_art(li, icon)
+        set_video_info(li, name, plot, year)
+        xbmcplugin.addDirectoryItem(HANDLE, build_url({"mode": "series_seasons", "series_id": str(item.get("series_id"))}), li, True)
+        return True
+    return False
+
+
+def search_menu(kind_filter: str = "all") -> None:
     term = xbmcgui.Dialog().input("Search Media4u TV", type=xbmcgui.INPUT_ALPHANUM).strip()
     if not term:
+        xbmcplugin.endOfDirectory(HANDLE)
         return
+
     xbmcplugin.setPluginCategory(HANDLE, f"Search: {term}")
     xbmcplugin.setContent(HANDLE, "videos")
-    lowered = term.lower()
     user, pwd, _label = get_effective_creds()
-    sources = [
+    all_sources = [
         ("Live", "player_api.php?action=get_live_streams", "live"),
         ("Movies", "player_api.php?action=get_vod_streams", "vod"),
         ("Series", "player_api.php?action=get_series", "series"),
     ]
+    sources = [source for source in all_sources if kind_filter in ("all", source[2])]
+    progress = xbmcgui.DialogProgress()
+    progress.create(ADDON_NAME, "Searching...")
     found = 0
-    for label, endpoint, kind in sources:
-        data = http_get_json(xc_api_url(endpoint))
-        if not isinstance(data, list):
-            continue
-        matches = [item for item in data if lowered in (item.get("name") or "").lower()]
-        for item in sorted_items(matches)[:80]:
-            name = f"{label}: {item.get('name') or 'Unknown'}"
-            icon = item.get("stream_icon") or item.get("cover") or item.get("cover_big") or ""
-            if kind == "live" and item.get("stream_id") is not None:
-                add_playable(name, f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{item.get('stream_id')}.ts", icon)
-                found += 1
-            elif kind == "vod" and item.get("stream_id") is not None:
-                ext = item.get("container_extension") or "mp4"
-                add_playable(name, f"{SERVER}/movie/{quote(user)}/{quote(pwd)}/{item.get('stream_id')}.{ext}", icon)
-                found += 1
-            elif kind == "series" and item.get("series_id"):
-                li = xbmcgui.ListItem(label=name)
-                set_art(li, icon)
-                xbmcplugin.addDirectoryItem(HANDLE, build_url({"mode": "series_seasons", "series_id": str(item.get("series_id"))}), li, True)
-                found += 1
+
+    try:
+        for index, (label, endpoint, kind) in enumerate(sources):
+            if progress.iscanceled():
+                break
+            progress.update(int((index / max(len(sources), 1)) * 100), f"Searching {label}...")
+            data = http_get_json(xc_api_url(endpoint), use_cache=False)
+            if not isinstance(data, list):
+                continue
+            matches = [item for item in data if isinstance(item, dict) and matches_term(item, term)]
+            for item in sorted_items(matches)[:120]:
+                if add_search_result(label, kind, item, user, pwd):
+                    found += 1
+        progress.update(100, "Done")
+    finally:
+        progress.close()
+
     if found == 0:
-        add_action("No search results found", "main")
+        add_action(f"No results for: {term}", "main")
+        add_action("Tip: try one word only, like Batman, News, Sport, or 2025", "main")
+        notify("No search results found")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def search_type_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Search")
+    # These must be folders, not plain action items. On some Kodi builds,
+    # non-playable action items do not open the keyboard/search route.
+    add_folder("Search Everything", "search_all")
+    add_folder("Search Live TV Channels", "search_live")
+    add_folder("Search Movies", "search_vod")
+    add_folder("Search Series", "search_series")
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -509,7 +584,7 @@ def main_menu() -> None:
     add_folder("Movies", "vod_categories")
     add_folder("Recently Added Movies", "recent_vod")
     add_folder("Series", "series_categories")
-    add_action("Search", "search")
+    add_folder("Search", "search")
     add_folder("Favourites", "favourites")
     add_folder("Tools", "tools")
     xbmcplugin.endOfDirectory(HANDLE)
@@ -543,7 +618,15 @@ def router(paramstring: str) -> None:
         fav_remove(params.get("url") or "")
         xbmc.executebuiltin("Container.Refresh")
     elif mode == "search":
-        search_menu()
+        search_type_menu()
+    elif mode == "search_all":
+        search_menu("all")
+    elif mode == "search_live":
+        search_menu("live")
+    elif mode == "search_vod":
+        search_menu("vod")
+    elif mode == "search_series":
+        search_menu("series")
     elif mode == "live_categories":
         list_categories("get_live_categories", "live_streams", "Live TV")
     elif mode == "vod_categories":
