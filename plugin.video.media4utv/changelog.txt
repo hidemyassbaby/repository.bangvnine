@@ -1,93 +1,10 @@
-v4.4.0 (17 January 2026)
-
-This release focuses on stability, simplicity, and a cleaner user experience, based on real-world usage and feedback.
-
-Key updates:
-
-Server URL has been updated to ensure reliable connectivity.
-
-Added support for channel favorites. Channels can now be added or removed by right clicking.
-
-A Settings option has been added to the bottom of the main menu for quicker access.
-
-Optional Account Status display on the main menu:
-
-Shows whether the addon is using Free Access or a Paid Login.
-
-Selecting the status opens Settings, allowing login details to be updated easily.
-
-Improved first-run experience, clearly guiding users to choose between Free Access and Paid Login.
-
-General UI cleanup to reduce clutter and provide a more polished, consumer-friendly feel.
-
-
-v4.2.0 (23 March 2025)
-This is a major quality-of-life update that brings more flexibility, stability, and compatibility.
-
-Key Improvements:
-Dual Mode Support:
-The addon now fully supports both M3U and Xtream Codes (XC) API. You can choose which mode to use via the settings menu.
-
-Structured Content Layout:
-All categories are now separated cleanly into:
-
-Live TV
-
-VOD (Movies)
-
-Series (TV Shows)
-Each section shows only the correct groupings, filtering out unrelated content (e.g., VOD won't show up in Live TV).
-
-Custom Credentials Support:
-Don’t want to use the default server?
-Enter your own server URL, username, and password in the settings, and the addon will automatically use those — completely bypassing the built-in media4u account.
-
-M3U as Default Mode:
-Since many servers have broken or limited Xtream API support, the addon now defaults to using the M3U playlist format, which works reliably with most IPTV providers.
-
-Auto Caching for Speed:
-To improve performance, the addon now caches M3U data for 1 hour. This drastically speeds up loading times and reduces repeated server requests.
-
-The cache updates silently in the background.
-
-Expired data is refreshed automatically when needed.
-
-Improved Kodi Compatibility:
-Replaced outdated functions (xbmc.translatePath) with modern ones (xbmcvfs.translatePath) to ensure the addon runs smoothly on Kodi 20+.
-
-
-
-v4.1.1 (20 March 2025)
-- Ensured login button only appears when no credentials are set.
-- Improved UI flow when credentials are missing:
-  - Shows only the "Login" button.
-- Enhanced caching to check on launch and update expired data.
-- Fixed background update issue that caused unnecessary popups.
-
-v4.1.0 (19 March 2025)
-- Fixed issue where Live TV categories were showing timestamps & incorrect data.
-- Ensured streams play correctly when clicked.
-- Removed all emoji/weird characters from UI dialogs.
-- Updated UI text to say "Updating Data" instead of "Updating M3U".
-- Added a "Force Update" button in the main menu to manually refresh the channel list.
-- Improved caching system:
-  - Categories and streams now store properly.
-  - Cache updates in the background every hour.
-  - If cache is expired, a popup prompts users to update.
-  - Implemented a structured **M3U parser** to handle large lists efficiently.
-
-v4.0.0 (18 March 2025)
-- Added a background service to refresh M3U data every hour.
-- Implemented pagination for large category & stream lists.
-- Stream playback now properly resolves and plays in Kodi.
-
-v3.0.0 (17 March 2025)
-- Optimized API requests to prevent timeouts.
-- Fixed bugs in settings retrieval for username & password.
-
-v2.0.0 (16 March 2025)
-- Major improvements in UI responsiveness.
-- Switched to using JSON caching for better performance.
-
-v1.0.0 (15 March 2025)
-- Initial release with Live TV support using Xtream API.
+Version 4.5.0
+- Updated for Kodi 21 and Kodi 22 Python 3 compatibility.
+- Added real search across Live TV, Movies, and Series.
+- Added Recently Added Movies menu.
+- Added Tools menu with account status, connection test, clear cache, and clear favourites.
+- Added 10 minute API cache to make menus faster and reduce repeated server calls.
+- Improved favourites handling and context menu actions.
+- Improved error handling for timeouts, bad JSON, and failed server responses.
+- Improved artwork and video metadata handling.
+- Removed missing fanart reference from addon.xml to avoid packaging warnings.
