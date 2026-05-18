@@ -1,6 +1,6 @@
 v4.5.4
 
-- Added Kodi v21 & v22 support
+- Added Kodi v22 support
 - Rebuilt search system
 - Added partial search matching
 - Added Search Everything
