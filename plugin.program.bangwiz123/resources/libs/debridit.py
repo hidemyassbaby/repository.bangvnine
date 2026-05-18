@@ -183,7 +183,7 @@ def updateDebrid(do, who):
 					if len(match) == 0: f.write(line)
 					else:
 						if match[0] not in data: f.write(line)
-						else: wiz.log('Removing Line: %s' % line, xbmc.LOGNOTICE)
+						else: wiz.log('Removing Line: %s' % line, xbmc.LOGINFO)
 				f.close()
 				wiz.LogNotify("[COLOR %s]%s[/COLOR]" % (COLOR1, name),'[COLOR %s]Addon Data: Cleared![/COLOR]' % COLOR2, 2000, icon)
 			except Exception as e:
@@ -224,10 +224,10 @@ def importlist(who):
 				if not m[0] == su:
 					if DIALOG.yesno(ADDONTITLE, "[COLOR %s]Would you like to import the [COLOR %s]Real Debrid[/COLOR] data for [COLOR %s]%s[/COLOR]?" % (COLOR2, COLOR1, COLOR1, n), "File: [COLOR green][B]%s[/B][/COLOR]" % m[0], "Saved:[/COLOR] [COLOR red][B]%s[/B][/COLOR]" % su if not su == '' else 'Saved:[/COLOR] [COLOR red][B]None[/B][/COLOR]', yeslabel="[B][COLOR green]Save Data[/COLOR][/B]", nolabel="[B][COLOR red]No Cancel[/COLOR][/B]"):
 						wiz.setS(sa, m[0])
-						wiz.log('[Import Data] %s: %s' % (who, str(m)), xbmc.LOGNOTICE)
-					else: wiz.log('[Import Data] Declined Import(%s): %s' % (who, str(m)), xbmc.LOGNOTICE)
-				else: wiz.log('[Import Data] Duplicate Entry(%s): %s' % (who, str(m))), xbmc.LOGNOTICE
-			else: wiz.log('[Import Data] No Match(%s): %s' % (who, str(m)), xbmc.LOGNOTICE)
+						wiz.log('[Import Data] %s: %s' % (who, str(m)), xbmc.LOGINFO)
+					else: wiz.log('[Import Data] Declined Import(%s): %s' % (who, str(m)), xbmc.LOGINFO)
+				else: wiz.log('[Import Data] Duplicate Entry(%s): %s' % (who, str(m))), xbmc.LOGINFO
+			else: wiz.log('[Import Data] No Match(%s): %s' % (who, str(m)), xbmc.LOGINFO)
 
 def activateDebrid(who):
 	if DEBRIDID[who]:

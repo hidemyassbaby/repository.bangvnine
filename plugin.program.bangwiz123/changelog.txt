@@ -1,0 +1,10 @@
+Bang Wizard 7.2.0
+
+- Refreshed for Kodi 21 Omega and Kodi 22 Piers.
+- Rebuilt downloader using modern urllib Request handling.
+- Fixed removed URLopener crash on newer Python.
+- Improved Dropbox shared-link handling so build ZIPs download directly.
+- Added ZIP validation to stop HTML preview pages being extracted as builds.
+- Added safer Kodi version parsing for 21.x and 22.x builds.
+- Cleaned main menu labels for a more premium wizard feel.
+- Removed cached Python bytecode before packaging.

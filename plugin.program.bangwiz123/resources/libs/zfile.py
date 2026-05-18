@@ -46,7 +46,7 @@ except ImportError:
     zlib = None
     crc32 = binascii.crc32
 import xbmc
-KODIV          = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 if KODIV > 17:
 	import xbmcaddon, xbmcgui, xbmcplugin #FTG mod for Kodi 18
 else:pass

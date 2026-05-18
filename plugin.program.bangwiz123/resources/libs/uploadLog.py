@@ -29,7 +29,6 @@ import re
 import socket
 import pyqrcode
 from urllib.parse import urlencode
-from urllib.request import FancyURLopener
 import urllib.request, urllib.error, urllib.parse
 import json
 import xbmc
@@ -80,9 +79,7 @@ class QRCode(xbmcgui.WindowXMLDialog):
 		if (controlId == self.okbutton):
 			self.close()
 
-# Custom urlopener to set user-agent
-class pasteURLopener(FancyURLopener):
-	version = '%s: %s' % (ADDON_ID, ADDONVERSION)
+USER_AGENT = '%s: %s' % (ADDON_ID, ADDONVERSION)
 
 class Main:
 	def __init__(self):
@@ -159,10 +156,10 @@ class Main:
 				crashlog_path = os.path.expanduser('~') # not 100% accurate (crashlogs can be created in the dir kodi was started from as well)
 				filematch = 'kodi_crashlog'
 			elif wiz.platform() == 'windows':
-				wiz.log("Windows crashlogs are not supported, please disable this option in the addon settings", xbmc.LOGNOTICE)
+				wiz.log("Windows crashlogs are not supported, please disable this option in the addon settings", xbmc.LOGINFO)
 				#self.showResult("Windows crashlogs are not supported, please disable this option in the addon settings")
 			elif wiz.platform() == 'android':
-				wiz.log("Android crashlogs are not supported, please disable this option in the addon settings", xbmc.LOGNOTICE)
+				wiz.log("Android crashlogs are not supported, please disable this option in the addon settings", xbmc.LOGINFO)
 				#self.showResult("Android crashlogs are not supported, please disable this option in the addon settings")
 			if crashlog_path and os.path.isdir(crashlog_path):
 				dirs, files = xbmcvfs.listdir(crashlog_path)
@@ -173,7 +170,7 @@ class Main:
 						lastcrash = items[-1]
 						logfiles.append(['crashlog', lastcrash])
 			if len(items) == 0:
-				wiz.log("No crashlog file found", xbmc.LOGNOTICE)
+				wiz.log("No crashlog file found", xbmc.LOGINFO)
 		return logfiles
 
 	def readLog(self, path):
@@ -184,10 +181,10 @@ class Main:
 			if content:
 				return True, content
 			else:
-				wiz.log('file is empty', xbmc.LOGNOTICE)
+				wiz.log('file is empty', xbmc.LOGINFO)
 				return False, "File is Empty"
 		except:
-			wiz.log('unable to read file', xbmc.LOGNOTICE)
+			wiz.log('unable to read file', xbmc.LOGINFO)
 			return False, "Unable to Read File"
 
 	def cleanLog(self, content):
@@ -203,18 +200,19 @@ class Main:
 		params['expiration'] = 'week'
 		params = urlencode(params)
 
-		url_opener = pasteURLopener()
+		data = params.encode('utf-8') if isinstance(params, str) else params
+		req = urllib.request.Request(URL, data=data, headers={'User-Agent': USER_AGENT})
 
 		try:
-			page = url_opener.open(URL, params)
+			page = urllib.request.urlopen(req, timeout=15)
 		except Exception as e:
 			a = 'failed to connect to the server'
 			wiz.log("%s: %s" % (a, str(e)), xbmc.LOGERROR)
 			return False, a
 
 		try:
-			page_url = page.url.strip()
-			wiz.log("URL for %s: %s" % (name, page_url), xbmc.LOGNOTICE)
+			page_url = page.geturl().strip()
+			wiz.log("URL for %s: %s" % (name, page_url), xbmc.LOGINFO)
 			return True, page_url
 		except Exception as e:
 			a = 'unable to retrieve the paste url'
@@ -234,7 +232,7 @@ class Main:
 				except: 
 					pass
 			except Exception as e:
-				wiz.log(str(e), xbmc.LOGNOTICE)
+				wiz.log(str(e), xbmc.LOGINFO)
 				confirm   = DIALOG.ok(ADDONTITLE, "[COLOR %s]%s[/COLOR]" % (COLOR2, message))
 		else:
 			confirm   = DIALOG.ok(ADDONTITLE, "[COLOR %s]%s[/COLOR]" % (COLOR2, message))

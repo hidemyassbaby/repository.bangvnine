@@ -152,7 +152,7 @@ AUTOFEQ          = int(float(AUTOFEQ)) if AUTOFEQ.isdigit() else 0
 TODAY            = date.today()
 TOMORROW         = TODAY + timedelta(days=1)
 THREEDAYS        = TODAY + timedelta(days=3)
-KODIV          = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 MCNAME           = wiz.mediaCenter()
 EXCLUDES         = uservar.EXCLUDES
 CACHETEXT        = uservar.CACHETEXT
@@ -247,29 +247,33 @@ def index():
 			addFile('None' if BUILDTHEME == "" else BUILDTHEME, 'theme', BUILDNAME, themeit=THEME5)
 	else: addDir('None', 'builds', themeit=THEME4)
 	if HIDESPACERS == 'No': addFile(wiz.sep(), '', themeit=THEME3)
-	addDir ('Builds', 'builds',   icon=ICONBUILDS,   themeit=THEME1)
-	addDir ('Maintenance', 'maint',    icon=ICONMAINT,    themeit=THEME1)
-	addDir ('Internet Tools' ,'net', icon=ICONCONTACT, themeit=THEME1)
+	addDir ('[B]Build Centre[/B]', 'builds',   icon=ICONBUILDS,   themeit=THEME1)
+	addDir ('[B]Maintenance Tools[/B]', 'maint',    icon=ICONMAINT,    themeit=THEME1)
+	addDir ('[B]Internet Tools[/B]' ,'net', icon=ICONCONTACT, themeit=THEME1)
 	if wiz.platform() == 'android' or DEVELOPER == 'true': addDir ('Apk Installer' ,'apk', icon=ICONAPK, themeit=THEME1)
 	if wiz.platform() == 'android' or wiz.platform() == 'windows' or DEVELOPER == 'true': addDir ('Retro Gaming Zone'       ,'retromenu', icon=ICONSAVE,     themeit=THEME1)
-	if not ADDONFILE == 'http://': addDir ('Addon Installer' ,'addons', icon=ICONADDONS, themeit=THEME1)
+	if not ADDONFILE == 'http://': addDir ('[B]Addon Installer[/B]' ,'addons', icon=ICONADDONS, themeit=THEME1)
 	if not YOUTUBEFILE == 'http://' and not YOUTUBETITLE == '': addDir (YOUTUBETITLE ,'youtube', icon=ICONYOUTUBE, themeit=THEME1)
-	addDir ('Save Login Data / Favs Options', 'savedata', icon=ICONSAVE,     themeit=THEME1)
-	addDir ('Backup/Restore Data Options'     ,'backup', icon=ICONSAVE,     themeit=THEME1)
+	addDir ('[B]Save Login Data / Favourites[/B]', 'savedata', icon=ICONSAVE,     themeit=THEME1)
+	addDir ('[B]Backup / Restore[/B]'     ,'backup', icon=ICONSAVE,     themeit=THEME1)
 	if HIDECONTACT == 'No': addFile('Contact' ,'contact', icon=ICONCONTACT,  themeit=THEME1)
 	if HIDESPACERS == 'No': addFile(wiz.sep(), '', themeit=THEME3)
-	addFile('Upload Log File', 'uploadlog',       icon=ICONMAINT, themeit=THEME1)
+	addFile('[B]Upload Log File[/B]', 'uploadlog',       icon=ICONMAINT, themeit=THEME1)
 	addFile('View Errors in Log: %s' % (errorsfound), 'viewerrorlog', icon=ICONMAINT, themeit=THEME1)
 	if errors > 0: addFile('View Last Error In Log', 'viewerrorlast', icon=ICONMAINT, themeit=THEME1)
 	if HIDESPACERS == 'No': addFile(wiz.sep(), '', themeit=THEME3)
-	addFile('Settings', 'settings', icon=ICONSETTINGS, themeit=THEME1)
-	addFile('Force Update Text Files', 'forcetext', icon=ICONMAINT, themeit=THEME1)
+	addFile('[B]Wizard Settings[/B]', 'settings', icon=ICONSETTINGS, themeit=THEME1)
+	addFile('[B]Refresh Wizard Text Files[/B]', 'forcetext', icon=ICONMAINT, themeit=THEME1)
 	if DEVELOPER == 'true': addDir('Developer Menu', 'developer', icon=ICON, themeit=THEME1)
 	setView('files', 'viewType')
 def KodiVer():
-	if KODIV >= 16.0 and KODIV <= 16.9:vername = 'Jarvis'
-	elif KODIV >= 17.0 and KODIV <= 17.9:vername = 'Krypton'
-	elif KODIV >= 18.0 and KODIV <= 18.9:vername = 'Leia'
+	if KODIV >= 16.0 and KODIV <= 16.9: vername = 'Jarvis'
+	elif KODIV >= 17.0 and KODIV <= 17.9: vername = 'Krypton'
+	elif KODIV >= 18.0 and KODIV <= 18.9: vername = 'Leia'
+	elif KODIV >= 19.0 and KODIV <= 19.9: vername = 'Matrix'
+	elif KODIV >= 20.0 and KODIV <= 20.9: vername = 'Nexus'
+	elif KODIV >= 21.0 and KODIV <= 21.9: vername = 'Omega'
+	elif KODIV >= 22.0 and KODIV <= 22.9: vername = 'Piers'
 	else: vername = "Unknown"
 	return vername
 def buildMenu():
@@ -1038,7 +1042,7 @@ def misc():
 		addFile('Reload Skin',                    'forceskin',       icon=ICONMAINT, themeit=THEME3)
 		addFile('Reload Profile',                 'forceprofile',    icon=ICONMAINT, themeit=THEME3)
 		addFile('Force Close Kodi',               'forceclose',      icon=ICONMAINT, themeit=THEME3)
-		addFile('Upload Log File', 'uploadlog',       icon=ICONMAINT, themeit=THEME3)
+		addFile('[B]Upload Log File[/B]', 'uploadlog',       icon=ICONMAINT, themeit=THEME3)
 		addFile('View Errors in Log: %s' % (errorsfound), 'viewerrorlog', icon=ICONMAINT, themeit=THEME3)
 		if errors > 0: addFile('View Last Error In Log', 'viewerrorlast', icon=ICONMAINT, themeit=THEME3)
 		addFile('View Log File',                  'viewlog',         icon=ICONMAINT, themeit=THEME3)
@@ -1127,7 +1131,7 @@ def speed():
 		if not os.path.exists(SPEEDTESTFOLD): os.makedirs(SPEEDTESTFOLD)
 		urlsplits = found[0].split('/')
 		dest = os.path.join(SPEEDTESTFOLD, urlsplits[-1])
-		urllib.request.urlretrieve(found[0], dest)
+		downloader.download(found[0], dest)
 		viewSpeedTest(urlsplits[-1])
 	except:
 		wiz.log("[Speed Test] Error Running Speed Test")

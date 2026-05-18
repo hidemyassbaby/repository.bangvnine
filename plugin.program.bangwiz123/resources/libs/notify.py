@@ -32,7 +32,7 @@ try:
 except ImportError:
     from urllib.parse import quote_plus
 
-KODIV            = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 transPath  = xbmcvfs.translatePath
 ADDON_ID       = uservar.ADDON_ID
 ADDON          = wiz.addonId(ADDON_ID)
@@ -61,7 +61,7 @@ BUILDNAME      = wiz.getS('buildname')
 BUILDVERSION   = wiz.getS('buildversion')
 LATESTVERSION  = wiz.checkBuild(BUILDNAME, 'version')
 TODAY          = date.today()
-KODIV          = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 TOMORROW       = TODAY + timedelta(days=1)
 THREEDAYS      = TODAY + timedelta(days=3)
 UPDATECHECK    = uservar.UPDATECHECK if str(uservar.UPDATECHECK).isdigit() else 1

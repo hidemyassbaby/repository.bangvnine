@@ -32,7 +32,7 @@ try:
 except:
     import simplejson
 
-KODIV  = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 COLOR1 = uservar.COLOR1
 COLOR2 = uservar.COLOR2
 transPath  = xbmc.translatePath if KODIV < 19 else xbmcvfs.translatePath

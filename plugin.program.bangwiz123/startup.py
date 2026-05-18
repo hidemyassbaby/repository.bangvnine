@@ -114,7 +114,7 @@ TOMORROW       = TODAY + timedelta(days=1)
 TWODAYS        = TODAY + timedelta(days=2)
 THREEDAYS      = TODAY + timedelta(days=3)
 ONEWEEK        = TODAY + timedelta(days=7)
-KODIV          = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 EXCLUDES       = uservar.EXCLUDES
 BUILDFILE      = uservar.BUILDFILE
 UPDATECHECK    = uservar.UPDATECHECK if str(uservar.UPDATECHECK).isdigit() else 1

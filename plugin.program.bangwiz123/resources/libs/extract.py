@@ -17,10 +17,10 @@
 #  http://www.gnu.org/copyleft/gpl.html                                        #
 ################################################################################
 
-import zipfile, xbmcaddon, xbmc, xbmcvfs, uservar, sys, os, time
+import zipfile, xbmcaddon, xbmc, xbmcvfs, uservar, sys, os, time, re
 
 from . import wizard as wiz
-KODIV          = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 
 ADDON_ID       = uservar.ADDON_ID
 ADDONTITLE     = uservar.ADDONTITLE
@@ -37,7 +37,7 @@ KEEPADVANCED   = wiz.getS('keepadvanced')
 KEEPSUPER      = wiz.getS('keepsuper')
 KEEPREPOS      = wiz.getS('keeprepos')
 KEEPWHITELIST  = wiz.getS('keepwhitelist')
-KODIV          = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 LOGFILES       = ['xbmc.log', 'xbmc.old.log', 'kodi.log', 'kodi.old.log', 'spmc.log', 'spmc.old.log', 'tvmc.log', 'tvmc.old.log', 'Thumbs.db', '.gitignore', '.DS_Store']
 bad_files      = ['onechannelcache.db', 'saltscache.db', 'saltscache.db-shm', 'saltscache.db-wal', 'saltshd.lite.db', 'saltshd.lite.db-shm', 'saltshd.lite.db-wal', 'queue.db', 'commoncache.db', 'access.log', 'trakt.db', 'video_cache.db']
 

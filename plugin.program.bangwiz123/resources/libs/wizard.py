@@ -125,7 +125,7 @@ TOMORROW       = TODAY + timedelta(days=1)
 TWODAYS        = TODAY + timedelta(days=2)
 THREEDAYS      = TODAY + timedelta(days=3)
 ONEWEEK        = TODAY + timedelta(days=7)
-KODIV          = float(xbmc.getInfoLabel("System.BuildVersion")[:4])
+KODIV          = float((re.search(r"\d+(?:\.\d+)?", xbmc.getInfoLabel("System.BuildVersion") or "0") or re.match(r"0", "0")).group(0))
 EXCLUDES       = uservar.EXCLUDES
 CACHETEXT      = uservar.CACHETEXT
 CACHEAGE       = uservar.CACHEAGE if str(uservar.CACHEAGE).isdigit() else 30
@@ -226,8 +226,9 @@ def SYSINFO():
 	ram_used      = convertSize(int(float(data[12][:-2]))*1024*1024)
 	ram_total     = convertSize(int(float(data[13][:-2]))*1024*1024)
 	
-	xbmc_version=xbmc.getInfoLabel("System.BuildVersion")
-	version=float(xbmc_version[:4])
+	xbmc_version=xbmc.getInfoLabel("System.BuildVersion") or '0'
+	match = re.search(r'\d+(?:\.\d+)?', xbmc_version)
+	version = float(match.group(0)) if match else 0.0
 	if version >= 11.0 and version <= 11.9:
 		codename = 'Eden'
 	elif version >= 12.0 and version <= 12.9:
@@ -246,6 +247,12 @@ def SYSINFO():
 		codename = 'Leia'
 	elif version >= 19.0 and version <= 19.9:
 		codename = 'Matrix'
+	elif version >= 20.0 and version <= 20.9:
+		codename = 'Nexus'
+	elif version >= 21.0 and version <= 21.9:
+		codename = 'Omega'
+	elif version >= 22.0 and version <= 22.9:
+		codename = 'Piers'
 	else: codename = "Decline"
 	picture = []; music = []; video = []; programs = []; repos = []; scripts = []; skins = []
 	

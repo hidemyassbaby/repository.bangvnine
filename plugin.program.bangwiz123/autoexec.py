@@ -64,7 +64,7 @@ def main():
 			xbmc.executebuiltin('UpdateLocalAddons()')
 			xbmc.executebuiltin("ReloadSkin()")
 			
-		def log(self, msg, level=xbmc.LOGNOTICE):
+		def log(self, msg, level=xbmc.LOGINFO):
 			try:
 				if isinstance(msg, str):
 					msg = '%s' % (msg.encode('utf-8'))
