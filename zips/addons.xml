@@ -1,5 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
+<addon id="plugin.video.microjen" name="MicroJen" version="0.1.3" provider-name="">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0" />
+    <import addon="script.module.requests" />
+    <import addon="script.module.routing"/>
+    <import addon="script.module.unidecode" />
+    <import addon="script.module.inputstreamhelper" />
+    <import addon="script.module.resolveurl"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Smaller jen</summary>
+    <platform>all</platform>
+    <language>en</language>
+    <license>GPL-2.0-or-later</license>
+	<assets>
+		<icon>icon.png</icon>
+		<fanart>fanart.jpg</fanart>
+  </assets>
+  </extension>
+</addon>
+
 <addon
   id="inputstream.adaptive"
   version="19.0.7"
@@ -283,48 +307,24 @@ v2.3.14 (2019-02-10)
   </extension>
 </addon>
 
-<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="7.2.0" provider-name="Bang">
-  <requires>
-    <import addon="xbmc.python" version="3.0.0"/>
-    <import addon="script.module.six" />
-    <import addon="script.module.kodi-six" />
-    <import addon="script.kodi.android.update" optional="true" version="1.3.2" />
-  </requires>
-  <extension point="xbmc.python.pluginsource" library="default.py">
-        <provides>executable</provides>
-  </extension>
-  <extension point="xbmc.service" library="startup.py" start="startup" />
-  <extension point="xbmc.addon.metadata">
-    <summary lang="en">Bang Wizard </summary>
-    <description lang="en">Bang Wizard - Build / Maintance works on Kodi V21 & V22</description>
-    <platform>all</platform>
-    <assets>
-        <icon>icon.png</icon>
-        <fanart>fanart.jpg</fanart>
-        <banner></banner>
-        <clearlogo></clearlogo>
-        <screenshot></screenshot>
-    </assets>
-  </extension>
-</addon>
-
-<addon id="plugin.video.iptvorg" name="IPTV-Org TV" version="1.0.4" provider-name="Bang">
-    <requires>
-        <import addon="xbmc.python" version="3.0.0"/>
-        <import addon="script.module.requests"/>
-    </requires>
-
-    <extension point="xbmc.python.pluginsource" library="default.py">
-        <provides>video</provides>
+<addon id="repository.dontpanic" name="Don't Panic" version="0.2.4" provider-name="pannal">
+    <extension point="xbmc.addon.repository" name="Don't Panic Kodi Repo">
+        <dir minversion="19.0.0" maxversion="19.9.9">
+            <info compressed="false">https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/</datadir>
+        </dir>
+        <dir minversion="20.0.0">
+            <info compressed="false">https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/</datadir>
+        </dir>
     </extension>
-
     <extension point="xbmc.addon.metadata">
-        <summary lang="en_GB">IPTV-Org TV For Kodi</summary>
-        <description lang="en_GB">Collection of publicly available IPTV channels from all over the world</description>
+        <summary>dontpanic</summary>
+        <description>Randomly reasonably stable hacked/improved/altered addons</description>
+        <disclaimer></disclaimer>
         <platform>all</platform>
-        <language>en_GB</language>
-        <license>GPL-2.0-or-later</license>
-        <disclaimer>This add-on does not host any content.</disclaimer>
         <assets>
             <icon>icon.png</icon>
             <fanart>fanart.jpg</fanart>
@@ -332,57 +332,64 @@ v2.3.14 (2019-02-10)
     </extension>
 </addon>
 
-<addon id="plugin.video.kiwitimecapsule" name="Kiwi Time Capsule" version="4.0" provider-name="Bang">
-  <requires>
-    <import addon="xbmc.python" version="3.0.0" />
-    <import addon="script.module.requests" />
-    <import addon="script.module.routing"/>
-    <import addon="script.module.unidecode" />
-    <import addon="script.module.inputstreamhelper" />
-    <import addon="script.module.resolveurl"/>
-    <import addon="script.module.microjenscrapers" />
-    <!--<import addon="name" />-->
-  </requires>
-  <extension point="xbmc.python.pluginsource" library="default.py">
-    <provides>video</provides>
-  </extension>
-    <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Kiwi Time Capsule</summary>
-    <description lang="en">Kiwi Time Capsule is your gateway to New Zealand’s screen history and fresh local gems. Dive into a curated collection of classic Kiwi TV shows, documentaries, and films, alongside a growing selection of modern Aotearoa cinema and series. Whether you're revisiting the past or discovering new favourites, this add-on brings together the best of NZ storytelling, all in one place.</description>
-    <platform>all</platform>
-    <language>en</language>
-    <license>GPL-2.0-or-later</license>
-  <assets>
-    <icon>icon.png</icon>
-    <fanart>fanart.jpg</fanart>
-  </assets>
-  </extension>
+<addon id="repository.bangvnine" name="Bang" version="9.2" provider-name="Bang">
+	<extension point="xbmc.addon.repository" name="Bang">
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/addons.xml</info>
+			<checksum>https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/addons.xml.md5</checksum>
+			<datadir zip="true">https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/</datadir>
+		</dir>
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml</info>
+			<checksum>https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml.md5</checksum>
+			<datadir zip="true">https://raw.githubusercontent.com/Gujal00/smrzips/master/zips/</datadir>
+		</dir>
+      	<dir>
+            <info compressed="false">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/</datadir>
+        </dir>
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/</datadir>
+		</dir>
+	</extension>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en"></summary>
+		<description lang="en">Bang Bang Bang Bang v19</description>
+		<genre></genre>
+		<assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+	</extension>
 </addon>
 
-<addon id="plugin.video.lemonade" name="Lemonade" version="6.0" provider-name="Lemonade">
-  <requires>
-    <import addon="xbmc.python" version="3.0.0" />
-    <import addon="script.module.requests" />
-    <import addon="script.module.routing"/>
-    <import addon="script.module.unidecode" />
-    <import addon="script.module.inputstreamhelper" />
-    <import addon="script.module.resolveurl"/>
-    <import addon="script.module.microjenscrapers" />
-    <!--<import addon="name" />-->
-  </requires>
-  <extension point="xbmc.python.pluginsource" library="default.py">
-    <provides>video</provides>
-  </extension>
-  <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Lemonade</summary>
-    <platform>all</platform>
-    <language>en</language>
-    <license>GPL-2.0-or-later</license>
-  <assets>
-    <icon>icon.png</icon>
-    <fanart>fanart.jpg</fanart>
-  </assets>
-  </extension>
+<addon id="resource.images.nztouchbackground" name="Skin Backgrounds NZ Touch" version="1.0" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack NZ Touch Build</summary>
+		<description lang="en">Skin Backgrounds Pack NZ Touch Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
+<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.178" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0" />
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack - Wayne Build</summary>
+		<description lang="en">Skin Backgrounds - Wayne Build</description>
+		<platform>all</platform>
+	</extension>
 </addon>
 
 <addon id="plugin.video.live.streamspro" name="LiveStreamsPro" version="3.0.0~alpha4" provider-name="gujal">
@@ -428,6 +435,89 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
+<addon id="plugin.video.lemonade" name="Lemonade" version="6.0" provider-name="Lemonade">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0" />
+    <import addon="script.module.requests" />
+    <import addon="script.module.routing"/>
+    <import addon="script.module.unidecode" />
+    <import addon="script.module.inputstreamhelper" />
+    <import addon="script.module.resolveurl"/>
+    <import addon="script.module.microjenscrapers" />
+    <!--<import addon="name" />-->
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Lemonade</summary>
+    <platform>all</platform>
+    <language>en</language>
+    <license>GPL-2.0-or-later</license>
+  <assets>
+    <icon>icon.png</icon>
+    <fanart>fanart.jpg</fanart>
+  </assets>
+  </extension>
+</addon>
+
+<addon id="plugin.program.bangwiz123" name="Bang Wizard" version="7.2.0" provider-name="Bang">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+    <import addon="script.module.six" />
+    <import addon="script.module.kodi-six" />
+    <import addon="script.kodi.android.update" optional="true" version="1.3.2" />
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+        <provides>executable</provides>
+  </extension>
+  <extension point="xbmc.service" library="startup.py" start="startup" />
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en">Bang Wizard </summary>
+    <description lang="en">Bang Wizard - Build / Maintance works on Kodi V21 & V22</description>
+    <platform>all</platform>
+    <assets>
+        <icon>icon.png</icon>
+        <fanart>fanart.jpg</fanart>
+        <banner></banner>
+        <clearlogo></clearlogo>
+        <screenshot></screenshot>
+    </assets>
+  </extension>
+</addon>
+
+<addon id="script.module.beautifulsoup4" name="BeautifulSoup4" version="4.9.3+matrix.1" provider-name="Leonard Richardson (leonardr@segfault.org)">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+    <import addon="script.module.soupsieve" version="2.0.0+matrix.1"/>
+  </requires>
+  <extension point="xbmc.python.module" library="lib" />
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Screen-scraping library</summary>
+    <description lang="en_GB">Beautiful Soup is a library that makes it easy to scrape information from web pages. It sits atop an HTML or XML parser, providing Pythonic idioms for iterating, searching, and modifying the parse tree.</description>
+    <license>MIT</license>
+    <platform>all</platform>
+    <website>https://www.crummy.com/software/BeautifulSoup/</website>
+	<source>https://code.launchpad.net/beautifulsoup</source>
+    <assets>
+      <icon>icon.png</icon>
+    </assets>
+  </extension>
+</addon>
+
+<addon id="resource.images.skinbackgrounds.xonfluencenigelbuild" name="Skin Backgrounds Nigel Build" version="1.181" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0" />
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack - Nigel Build</summary>
+		<description lang="en">Skin Backgrounds - Nigel Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
 <addon id="plugin.video.media4utv" name="Media4u TV" version="4.5.4" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
@@ -451,47 +541,41 @@ In addition to what livestreams allowed you to do, you can now,
     </extension>
 </addon>
 
-<addon id="plugin.video.microjen" name="MicroJen" version="0.1.3" provider-name="">
-  <requires>
-    <import addon="xbmc.python" version="3.0.0" />
-    <import addon="script.module.requests" />
-    <import addon="script.module.routing"/>
-    <import addon="script.module.unidecode" />
-    <import addon="script.module.inputstreamhelper" />
-    <import addon="script.module.resolveurl"/>
-  </requires>
-  <extension point="xbmc.python.pluginsource" library="default.py">
-    <provides>video</provides>
-  </extension>
-  <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Smaller jen</summary>
-    <platform>all</platform>
-    <language>en</language>
-    <license>GPL-2.0-or-later</license>
-	<assets>
-		<icon>icon.png</icon>
-		<fanart>fanart.jpg</fanart>
-  </assets>
-  </extension>
+<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzau" name="Skin Backgrounds NZ AUS" version="5.6" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0"/>
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack NZ Ausralia build</summary>
+		<description lang="en">Skin Backgrounds Pack NZ Australia Build</description>
+		<platform>all</platform>
+	</extension>
 </addon>
 
-<addon id="plugin.video.nocable" name="No Cable" version="2.2" provider-name="Bang">
-  <extension point="xbmc.python.pluginsource"
-            library="default.py">
-    <provides>video</provides>
-  </extension>
-  <extension point="xbmc.addon.metadata">
-    <summary lang="en">Addon is now Broken</summary>
-    <language>en</language>
-    <description lang="en">No Cable TV is a versatile live TV add-on offering a wide range of streaming options. Enjoy access to live TV channels from around the world, plus a large library of movies and TV shows—all without needing a traditional cable subscription. With a sleek interface and reliable streaming, No Cable TV lets you watch your favorite content anytime, anywhere, making it perfect for cord-cutters seeking easy access to live broadcasts and on-demand entertainment.</description>
-    <platform>all</platform>
-    <assets>
-      <icon>icon.png</icon>
-      <fanart>fanart.jpg</fanart>
-    </assets>
-    <!-- Add a broken tag or metadata indicating it's broken -->
-    <broken>true</broken> <!-- Indicates the addon is broken -->
-  </extension>
+<addon id="plugin.video.iptvorg" name="IPTV-Org TV" version="1.0.4" provider-name="Bang">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+        <import addon="script.module.requests"/>
+    </requires>
+
+    <extension point="xbmc.python.pluginsource" library="default.py">
+        <provides>video</provides>
+    </extension>
+
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en_GB">IPTV-Org TV For Kodi</summary>
+        <description lang="en_GB">Collection of publicly available IPTV channels from all over the world</description>
+        <platform>all</platform>
+        <language>en_GB</language>
+        <license>GPL-2.0-or-later</license>
+        <disclaimer>This add-on does not host any content.</disclaimer>
+        <assets>
+            <icon>icon.png</icon>
+            <fanart>fanart.jpg</fanart>
+        </assets>
+    </extension>
 </addon>
 
 <addon id="plugin.video.sportshroud" name="SportShroud" version="2.0.0" provider-name="Bang">
@@ -516,40 +600,6 @@ In addition to what livestreams allowed you to do, you can now,
             <fanart>fanart.jpg</fanart>
         </assets>
     </extension>
-</addon>
-
-<addon id="repository.bangbeta" name="Bang Beta" version="1.1" provider-name="Bang">
-	<extension point="xbmc.addon.repository" name="Bang">
-		<dir>
-			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bangbeta/master/zips/addons.xml</info>
-			<checksum>https://raw.githubusercontent.com/hidemyassbaby/repository.bangbeta/master/zips/addons.xml.md5</checksum>
-			<datadir zip="true">https://raw.githubusercontent.com/hidemyassbaby/repository.bangbeta/master/zips/</datadir>
-		</dir>
-		<dir>
-			<info compressed="false">https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml</info>
-			<checksum>https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml.md5</checksum>
-			<datadir zip="true">https://raw.githubusercontent.com/Gujal00/smrzips/master/zips/</datadir>
-		</dir>
-      	<dir>
-            <info compressed="false">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml</info>
-            <checksum>https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml.md5</checksum>
-            <datadir zip="true">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/</datadir>
-        </dir>
-		<dir>
-			<info compressed="false">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml</info>
-            <checksum>https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml.md5</checksum>
-            <datadir zip="true">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/</datadir>
-		</dir>
-	</extension>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en"></summary>
-		<description lang="en">Bang Beta</description>
-		<genre></genre>
-		<assets>
-      <icon>icon.png</icon>
-      <fanart>fanart.jpg</fanart>
-    </assets>
-	</extension>
 </addon>
 
 <addon id="repository.bangbuilds" name="Bang Builds" version="1.2" provider-name="Bang">
@@ -586,159 +636,30 @@ In addition to what livestreams allowed you to do, you can now,
 	</extension>
 </addon>
 
-<addon id="repository.bangvnine" name="Bang" version="9.2" provider-name="Bang">
-	<extension point="xbmc.addon.repository" name="Bang">
-		<dir>
-			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/addons.xml</info>
-			<checksum>https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/addons.xml.md5</checksum>
-			<datadir zip="true">https://raw.githubusercontent.com/hidemyassbaby/repository.bangvnine/master/zips/</datadir>
-		</dir>
-		<dir>
-			<info compressed="false">https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml</info>
-			<checksum>https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml.md5</checksum>
-			<datadir zip="true">https://raw.githubusercontent.com/Gujal00/smrzips/master/zips/</datadir>
-		</dir>
-      	<dir>
-            <info compressed="false">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml</info>
-            <checksum>https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml.md5</checksum>
-            <datadir zip="true">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/</datadir>
-        </dir>
-		<dir>
-			<info compressed="false">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml</info>
-            <checksum>https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml.md5</checksum>
-            <datadir zip="true">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/</datadir>
-		</dir>
-	</extension>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en"></summary>
-		<description lang="en">Bang Bang Bang Bang v19</description>
-		<genre></genre>
-		<assets>
-      <icon>icon.png</icon>
-      <fanart>fanart.jpg</fanart>
-    </assets>
-	</extension>
-</addon>
-
-<addon id="repository.dontpanic" name="Don't Panic" version="0.2.4" provider-name="pannal">
-    <extension point="xbmc.addon.repository" name="Don't Panic Kodi Repo">
-        <dir minversion="19.0.0" maxversion="19.9.9">
-            <info compressed="false">https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/addons.xml</info>
-            <checksum>https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/addons.xml.md5</checksum>
-            <datadir zip="true">https://raw.githubusercontent.com/pannal/dontpanickodi/master/matrix/zips/</datadir>
-        </dir>
-        <dir minversion="20.0.0">
-            <info compressed="false">https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/addons.xml</info>
-            <checksum>https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/addons.xml.md5</checksum>
-            <datadir zip="true">https://raw.githubusercontent.com/pannal/dontpanickodi/master/nexus/zips/</datadir>
-        </dir>
-    </extension>
-    <extension point="xbmc.addon.metadata">
-        <summary>dontpanic</summary>
-        <description>Randomly reasonably stable hacked/improved/altered addons</description>
-        <disclaimer></disclaimer>
-        <platform>all</platform>
-        <assets>
-            <icon>icon.png</icon>
-            <fanart>fanart.jpg</fanart>
-        </assets>
-    </extension>
-</addon>
-
-<addon id="resource.images.nztouchbackground" name="Skin Backgrounds NZ Touch" version="1.0" provider-name="">
-
-	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
-	<requires>
-		<import addon="kodi.resource" version="1.0.0"/>
-	</requires>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack NZ Touch Build</summary>
-		<description lang="en">Skin Backgrounds Pack NZ Touch Build</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.126" provider-name="">
-
-	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
-	<requires>
-		<import addon="kodi.resource" version="1.0.0" />
-	</requires>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack - Duncan Build</summary>
-		<description lang="en">Skin Backgrounds - Duncan Build</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="resource.images.skinbackgrounds.xonfluencenigelbuild" name="Skin Backgrounds Nigel Build" version="1.181" provider-name="">
-
-	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
-	<requires>
-		<import addon="kodi.resource" version="1.0.0" />
-	</requires>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack - Nigel Build</summary>
-		<description lang="en">Skin Backgrounds - Nigel Build</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="resource.images.skinbackgrounds.xonfluencenzbuildnzau" name="Skin Backgrounds NZ AUS" version="5.6" provider-name="">
-
-	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
-	<requires>
-		<import addon="kodi.resource" version="1.0.0"/>
-	</requires>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack NZ Ausralia build</summary>
-		<description lang="en">Skin Backgrounds Pack NZ Australia Build</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.104" provider-name="">
-
-	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
-	<requires>
-		<import addon="kodi.resource" version="1.0.0" />
-	</requires>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack - Sheena Build</summary>
-		<description lang="en">Skin Backgrounds - Sheena Build</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.178" provider-name="">
-
-	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
-	<requires>
-		<import addon="kodi.resource" version="1.0.0" />
-	</requires>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Skin Backgrounds Pack - Wayne Build</summary>
-		<description lang="en">Skin Backgrounds - Wayne Build</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="script.module.beautifulsoup4" name="BeautifulSoup4" version="4.9.3+matrix.1" provider-name="Leonard Richardson (leonardr@segfault.org)">
+<addon id="plugin.video.kiwitimecapsule" name="Kiwi Time Capsule" version="4.0" provider-name="Bang">
   <requires>
-    <import addon="xbmc.python" version="3.0.0"/>
-    <import addon="script.module.soupsieve" version="2.0.0+matrix.1"/>
+    <import addon="xbmc.python" version="3.0.0" />
+    <import addon="script.module.requests" />
+    <import addon="script.module.routing"/>
+    <import addon="script.module.unidecode" />
+    <import addon="script.module.inputstreamhelper" />
+    <import addon="script.module.resolveurl"/>
+    <import addon="script.module.microjenscrapers" />
+    <!--<import addon="name" />-->
   </requires>
-  <extension point="xbmc.python.module" library="lib" />
-  <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Screen-scraping library</summary>
-    <description lang="en_GB">Beautiful Soup is a library that makes it easy to scrape information from web pages. It sits atop an HTML or XML parser, providing Pythonic idioms for iterating, searching, and modifying the parse tree.</description>
-    <license>MIT</license>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video</provides>
+  </extension>
+    <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Kiwi Time Capsule</summary>
+    <description lang="en">Kiwi Time Capsule is your gateway to New Zealand’s screen history and fresh local gems. Dive into a curated collection of classic Kiwi TV shows, documentaries, and films, alongside a growing selection of modern Aotearoa cinema and series. Whether you're revisiting the past or discovering new favourites, this add-on brings together the best of NZ storytelling, all in one place.</description>
     <platform>all</platform>
-    <website>https://www.crummy.com/software/BeautifulSoup/</website>
-	<source>https://code.launchpad.net/beautifulsoup</source>
-    <assets>
-      <icon>icon.png</icon>
-    </assets>
+    <language>en</language>
+    <license>GPL-2.0-or-later</license>
+  <assets>
+    <icon>icon.png</icon>
+    <fanart>fanart.jpg</fanart>
+  </assets>
   </extension>
 </addon>
 
@@ -768,5 +689,84 @@ In addition to what livestreams allowed you to do, you can now,
     </assets>
     <news></news>
     </extension>
+</addon>
+
+<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.104" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0" />
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack - Sheena Build</summary>
+		<description lang="en">Skin Backgrounds - Sheena Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
+<addon id="repository.bangbeta" name="Bang Beta" version="1.1" provider-name="Bang">
+	<extension point="xbmc.addon.repository" name="Bang">
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/hidemyassbaby/repository.bangbeta/master/zips/addons.xml</info>
+			<checksum>https://raw.githubusercontent.com/hidemyassbaby/repository.bangbeta/master/zips/addons.xml.md5</checksum>
+			<datadir zip="true">https://raw.githubusercontent.com/hidemyassbaby/repository.bangbeta/master/zips/</datadir>
+		</dir>
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml</info>
+			<checksum>https://raw.githubusercontent.com/Gujal00/smrzips/master/addons.xml.md5</checksum>
+			<datadir zip="true">https://raw.githubusercontent.com/Gujal00/smrzips/master/zips/</datadir>
+		</dir>
+      	<dir>
+            <info compressed="false">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/teamuniversal/scrapers/master/_modules4all/zips/</datadir>
+        </dir>
+		<dir>
+			<info compressed="false">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/totalrevolution/python-koding/master/zips/</datadir>
+		</dir>
+	</extension>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en"></summary>
+		<description lang="en">Bang Beta</description>
+		<genre></genre>
+		<assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+	</extension>
+</addon>
+
+<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.127" provider-name="">
+
+	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
+	<requires>
+		<import addon="kodi.resource" version="1.0.0" />
+	</requires>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Skin Backgrounds Pack - Duncan Build</summary>
+		<description lang="en">Skin Backgrounds - Duncan Build</description>
+		<platform>all</platform>
+	</extension>
+</addon>
+
+<addon id="plugin.video.nocable" name="No Cable" version="2.2" provider-name="Bang">
+  <extension point="xbmc.python.pluginsource"
+            library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en">Addon is now Broken</summary>
+    <language>en</language>
+    <description lang="en">No Cable TV is a versatile live TV add-on offering a wide range of streaming options. Enjoy access to live TV channels from around the world, plus a large library of movies and TV shows—all without needing a traditional cable subscription. With a sleek interface and reliable streaming, No Cable TV lets you watch your favorite content anytime, anywhere, making it perfect for cord-cutters seeking easy access to live broadcasts and on-demand entertainment.</description>
+    <platform>all</platform>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+    <!-- Add a broken tag or metadata indicating it's broken -->
+    <broken>true</broken> <!-- Indicates the addon is broken -->
+  </extension>
 </addon>
 </addons>
