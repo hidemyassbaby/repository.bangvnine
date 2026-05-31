@@ -640,7 +640,7 @@ v2.3.14 (2019-02-10)
   </extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.107" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencesheena" name="Skin Backgrounds Sheena Build" version="1.108" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
