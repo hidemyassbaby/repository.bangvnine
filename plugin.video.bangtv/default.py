@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.7
+Version 1.0.10
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -42,7 +42,7 @@ DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.7",
+    "User-Agent": "Kodi BangTV/1.0.10",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -63,14 +63,20 @@ EPG_TTL_SECONDS = 6 * 60 * 60
 PAGE_SIZE = 20
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
 ADDON_ICON = xbmcvfs.translatePath(ADDON.getAddonInfo("icon")) or "icon.png"
-ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.7"
+ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.10"
 VERSION_MARKER_FILE = os.path.join(PROFILE_PATH, "installed_version.txt")
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 PLAY_LINKS_FILE = os.path.join(PROFILE_PATH, "play_links.json")
 LIVE_UPDATE_STATE_FILE = os.path.join(PROFILE_PATH, "live_update_state.json")
+RECENT_LIVE_FILE = os.path.join(PROFILE_PATH, "recent_live.json")
+HIDDEN_LIVE_CATEGORIES_FILE = os.path.join(PROFILE_PATH, "hidden_live_categories.json")
+STREAM_HEALTH_FILE = os.path.join(PROFILE_PATH, "stream_health.json")
+BACKUP_FILE = os.path.join(PROFILE_PATH, "bangtv_user_backup.json")
 LIVE_AUTO_CHECK_SECONDS = 30 * 60
 LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
 LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD = 20
+LIVE_ACTIVE_CATEGORY_CHECK_SECONDS = 10 * 60
+LIVE_RECENT_CATEGORY_CHECK_SECONDS = 30 * 60
 
 
 
@@ -628,6 +634,30 @@ def http_get_json(url: str, timeout: int = 25, use_cache: bool = True, silent: b
 
 
 
+def get_cached_json_any_age(url: str) -> Optional[Any]:
+    try:
+        cache = load_cache()
+        cached = cache.get(url)
+        if isinstance(cached, dict) and "data" in cached:
+            return cached.get("data")
+    except Exception:
+        pass
+    return None
+
+
+def mark_live_category_opened(cat_id: str, title: str = "") -> None:
+    try:
+        state = load_live_update_state()
+        now = int(time.time())
+        state["live_opened_at"] = now
+        state["active_live_category_id"] = str(cat_id or "")
+        state["active_live_category_title"] = title or "Live TV"
+        state["active_live_category_opened_at"] = now
+        save_live_update_state(state)
+    except Exception:
+        pass
+
+
 def cached_json_is_fresh(url: str, ttl: int = CACHE_TTL_SECONDS) -> bool:
     try:
         cache = load_cache()
@@ -831,6 +861,10 @@ def live_stats_summary() -> Dict[str, Any]:
         "status": status,
         "background_enabled": True,
         "high_activity": high_until > now,
+        "active_category_id": state.get("active_live_category_id") or "",
+        "active_category_title": state.get("active_live_category_title") or "None",
+        "active_category_last_check": int((state.get("category_checks") if isinstance(state.get("category_checks"), dict) else {}).get(str(state.get("active_live_category_id") or ""), 0) or 0),
+        "active_category_next_check": int((state.get("category_checks") if isinstance(state.get("category_checks"), dict) else {}).get(str(state.get("active_live_category_id") or ""), 0) or 0) + (LIVE_ACTIVE_CATEGORY_CHECK_SECONDS if high_until > now else LIVE_RECENT_CATEGORY_CHECK_SECONDS) if state.get("active_live_category_id") else 0,
         "last_result": last_result,
     }
 
@@ -954,6 +988,9 @@ def live_tv_stats() -> None:
         f"Oldest category cache: {nice_time(int(stats.get('oldest_update', 0) or 0))}",
         f"Last server check: {nice_time(int(stats.get('last_check', 0) or 0))}",
         f"Next auto check: {nice_time(int(stats.get('next_check', 0) or 0)) if stats.get('next_check') else 'When Live TV is opened'}",
+        f"Active category: {stats.get('active_category_title', 'None')}",
+        f"Active category last checked: {nice_time(int(stats.get('active_category_last_check', 0) or 0))}",
+        f"Active category next check: {nice_time(int(stats.get('active_category_next_check', 0) or 0)) if stats.get('active_category_next_check') else 'When opened again'}",
         f"Total categories: {stats.get('total_categories', 0)}",
         f"Cached categories: {stats.get('cached_categories', 0)}",
         f"Total cached channels: {stats.get('total_channels', 0)}",
@@ -1749,6 +1786,199 @@ def write_json_file(path: str, data: Any) -> None:
 
 
 
+def recent_live_load() -> List[Dict[str, str]]:
+    data = read_json_file(RECENT_LIVE_FILE, [])
+    return data if isinstance(data, list) else []
+
+
+def recent_live_add(name: str, stream_id: Any, url: str, thumb: str = "", category_id: str = "", epg_plot: str = "", meta: Optional[Dict[str, Any]] = None) -> None:
+    sid = str(stream_id or "").strip()
+    if not sid:
+        return
+    items = [i for i in recent_live_load() if str(i.get("stream_id") or "") != sid]
+    saved_meta = meta if isinstance(meta, dict) else {}
+    if epg_plot and not saved_meta.get("plot"):
+        saved_meta["plot"] = epg_plot
+    saved_meta["mediatype"] = "video"
+    items.insert(0, {
+        "name": name or "Unknown",
+        "stream_id": sid,
+        "url": url or "",
+        "thumb": thumb or "",
+        "category_id": str(category_id or ""),
+        "epg_plot": epg_plot or saved_meta.get("plot") or "",
+        "meta": saved_meta,
+        "time": int(time.time()),
+    })
+    write_json_file(RECENT_LIVE_FILE, items[:50])
+
+
+def recent_live_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Recently Watched")
+    xbmcplugin.setContent(HANDLE, "videos")
+    items = recent_live_load()
+    if not items:
+        add_action("No recently watched channels yet", "live_categories")
+    for item in items:
+        sid = str(item.get("stream_id") or "")
+        cached_plot = item.get("epg_plot") or (item.get("meta") or {}).get("plot") or ""
+        fresh_epg = live_epg(sid) if sid else {}
+        plot = fresh_epg.get("plot") or cached_plot or "Recently watched Live TV channel."
+        meta = dict(item.get("meta") or {})
+        meta["plot"] = plot
+        meta["mediatype"] = "video"
+        add_playable(item.get("name") or "Unknown", item.get("url") or "", item.get("thumb") or "", plot, None, meta, "", "", "", sid, item.get("category_id") or "")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def hidden_live_load() -> Dict[str, Dict[str, str]]:
+    data = read_json_file(HIDDEN_LIVE_CATEGORIES_FILE, {})
+    return data if isinstance(data, dict) else {}
+
+
+def hidden_live_is_hidden(cat_id: str) -> bool:
+    return str(cat_id or "") in hidden_live_load()
+
+
+def hidden_live_add(cat_id: str, name: str) -> None:
+    data = hidden_live_load()
+    cid = str(cat_id or "").strip()
+    if cid:
+        data[cid] = {"name": name or cid, "time": int(time.time())}
+        write_json_file(HIDDEN_LIVE_CATEGORIES_FILE, data)
+        notify("Category hidden")
+
+
+def hidden_live_remove(cat_id: str) -> None:
+    data = hidden_live_load()
+    data.pop(str(cat_id or ""), None)
+    write_json_file(HIDDEN_LIVE_CATEGORIES_FILE, data)
+    notify("Category restored")
+
+
+def hidden_live_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Hidden Live TV Categories")
+    data = hidden_live_load()
+    if not data:
+        add_action("No hidden categories", "live_categories")
+    for cid, item in sorted(data.items(), key=lambda kv: (kv[1].get("name") or "").lower() if isinstance(kv[1], dict) else kv[0]):
+        name = item.get("name") if isinstance(item, dict) else cid
+        add_action(f"Unhide: {name}", "live_category_unhide", {"cat_id": cid}, plot="Restores this category to the main Live TV category list.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def stream_health_load() -> Dict[str, Dict[str, Any]]:
+    data = read_json_file(STREAM_HEALTH_FILE, {})
+    return data if isinstance(data, dict) else {}
+
+
+def stream_health_status(stream_id: Any) -> str:
+    sid = str(stream_id or "")
+    data = stream_health_load().get(sid, {})
+    if not isinstance(data, dict):
+        return "Unknown"
+    fails = int(data.get("fails", 0) or 0)
+    last_ok = int(data.get("last_ok", 0) or 0)
+    if fails >= 3:
+        return "Offline or failing"
+    if fails:
+        return "Slow or unstable"
+    if last_ok:
+        return "Working"
+    return "Unknown"
+
+
+def stream_health_mark(stream_id: Any, ok: bool) -> None:
+    sid = str(stream_id or "").strip()
+    if not sid:
+        return
+    data = stream_health_load()
+    item = data.get(sid) if isinstance(data.get(sid), dict) else {}
+    if ok:
+        item["last_ok"] = int(time.time())
+        item["fails"] = 0
+    else:
+        item["last_fail"] = int(time.time())
+        item["fails"] = int(item.get("fails", 0) or 0) + 1
+    data[sid] = item
+    write_json_file(STREAM_HEALTH_FILE, data)
+
+
+def live_dashboard() -> None:
+    stats = live_stats_summary()
+    state = load_live_update_state()
+    ch = (state.get("last_result") or {}).get("channel_changes") if isinstance(state.get("last_result"), dict) else {}
+    text = "Bang TV Server Dashboard\n\n"
+    text += f"Server: {SERVER}\n"
+    text += f"Last update: {nice_time(int(stats.get('newest_update', 0) or 0))}\n"
+    text += f"Last server check: {nice_time(int(stats.get('last_check', 0) or 0))}\n"
+    text += f"Categories: {stats.get('total_categories', 0)}\n"
+    text += f"Cached categories: {stats.get('cached_categories', 0)}\n"
+    text += f"Cached channels: {stats.get('total_channels', 0)}\n"
+    text += f"Changes last check: +{int((ch or {}).get('added_count', 0) or 0)}, -{int((ch or {}).get('removed_count', 0) or 0)}, changed {int((ch or {}).get('changed_count', 0) or 0)}\n"
+    text += f"High Activity Mode: {'On' if stats.get('high_activity') else 'Off'}\n"
+    text += f"Cache health: {stats.get('status', 'Unknown')}\n"
+    text += f"Background updates: {'Enabled' if stats.get('background_enabled') else 'Disabled'}\n"
+    xbmcgui.Dialog().textviewer("Bang TV Dashboard", text)
+
+
+def live_auto_cleanup(show_notice: bool = True) -> None:
+    now = int(time.time())
+    try:
+        # trim API cache entries older than 30 days, keeping login/settings/favourites alone
+        cache = load_cache()
+        new_cache = {}
+        for key, value in cache.items():
+            if not isinstance(value, dict) or now - int(value.get("time", 0) or 0) <= 30 * 24 * 60 * 60:
+                new_cache[key] = value
+        save_cache(new_cache)
+        # trim recent and stream health
+        write_json_file(RECENT_LIVE_FILE, recent_live_load()[:50])
+        health = stream_health_load()
+        health = {k: v for k, v in health.items() if isinstance(v, dict) and now - max(int(v.get("last_ok", 0) or 0), int(v.get("last_fail", 0) or 0)) <= 30 * 24 * 60 * 60}
+        write_json_file(STREAM_HEALTH_FILE, health)
+        if show_notice:
+            notify("Bang TV cleanup complete")
+    except Exception as exc:
+        log(f"Auto cleanup failed: {exc}", xbmc.LOGWARNING)
+        if show_notice:
+            notify("Cleanup failed", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def backup_settings() -> None:
+    data = {
+        "created": int(time.time()),
+        "favourites": fav_load(),
+        "recent_live": recent_live_load(),
+        "hidden_live_categories": hidden_live_load(),
+        "stream_health": stream_health_load(),
+        "live_update_state": load_live_update_state(),
+    }
+    write_json_file(BACKUP_FILE, data)
+    xbmcgui.Dialog().ok(ADDON_NAME, f"Backup saved to:\n{BACKUP_FILE}")
+
+
+def restore_settings() -> None:
+    data = read_json_file(BACKUP_FILE, {})
+    if not isinstance(data, dict) or not data:
+        notify("No backup found", icon=xbmcgui.NOTIFICATION_WARNING)
+        return
+    if not xbmcgui.Dialog().yesno(ADDON_NAME, "Restore favourites, hidden categories, recent channels and Live TV update state from backup?"):
+        return
+    if isinstance(data.get("favourites"), list):
+        fav_save(data.get("favourites"))
+    if isinstance(data.get("recent_live"), list):
+        write_json_file(RECENT_LIVE_FILE, data.get("recent_live"))
+    if isinstance(data.get("hidden_live_categories"), dict):
+        write_json_file(HIDDEN_LIVE_CATEGORIES_FILE, data.get("hidden_live_categories"))
+    if isinstance(data.get("stream_health"), dict):
+        write_json_file(STREAM_HEALTH_FILE, data.get("stream_health"))
+    if isinstance(data.get("live_update_state"), dict):
+        save_live_update_state(data.get("live_update_state"))
+    notify("Backup restored")
+
+
+
 def save_play_link(url: str) -> str:
     """Store direct stream URLs outside the visible Kodi item/context URL."""
     if not url:
@@ -2091,7 +2321,7 @@ def add_fav_context(li: xbmcgui.ListItem, name: str, play_url: str, thumb: str =
         li.addContextMenuItems([("Add to Bang TV favourites", cmd)], replaceItems=True)
 
 
-def add_playable(name: str, play_url: str, thumb: str = "", plot: str = "", year: Any = None, meta: Optional[Dict[str, Any]] = None, fanart: str = "", trailer_content_type: str = "", trailer_item_id: Any = "") -> None:
+def add_playable(name: str, play_url: str, thumb: str = "", plot: str = "", year: Any = None, meta: Optional[Dict[str, Any]] = None, fanart: str = "", trailer_content_type: str = "", trailer_item_id: Any = "", live_stream_id: Any = "", live_category_id: str = "") -> None:
     li = xbmcgui.ListItem(label=name)
     set_art(li, thumb, fanart)
     set_video_info(li, name, plot, year, meta)
@@ -2099,11 +2329,16 @@ def add_playable(name: str, play_url: str, thumb: str = "", plot: str = "", year
     # Use a Bang TV plugin playback route instead of exposing direct .mkv/.ts URLs as the item URL.
     # This reduces global Real-Debrid/third-party context menu injection on Movies and TV Shows.
     token = save_play_link(play_url)
-    plugin_play_url = build_url({"mode": "play", "id": token}) if token else build_url({"mode": "play"})
+    if live_stream_id:
+        plugin_play_url = build_url({"mode": "play", "id": token, "live_id": str(live_stream_id), "name": name, "thumb": thumb or "", "cat_id": live_category_id or "", "epg_plot": (plot or "")[:1500]}) if token else build_url({"mode": "play"})
+    else:
+        plugin_play_url = build_url({"mode": "play", "id": token}) if token else build_url({"mode": "play"})
     li.setProperty("IsPlayable", "true")
     li.setPath(plugin_play_url)
 
     context_items = []
+    if live_stream_id:
+        context_items.append((f"Stream health: {stream_health_status(live_stream_id)}", f'Notification({ADDON_NAME},Stream health: {stream_health_status(live_stream_id)},2500)'))
     if play_url:
         if fav_is_saved(play_url):
             context_items.append(("Remove from Bang TV favourites", f'RunPlugin({build_url({"mode": "fav_remove_token", "id": token})})'))
@@ -2154,6 +2389,8 @@ def list_categories(action: str, next_mode: str, title: str) -> None:
     if action == "get_live_categories":
         add_action("Live TV Stats", "live_stats", plot="Show last update, next check, changed channels, changed categories and cache status.")
         add_action("Refresh Live TV", "live_refresh", plot="Force Bang TV to get the latest Live TV categories, channels and EPG from the server.")
+        add_folder("Recently Watched", "recent_live", plot="Open recent Live TV channels.")
+        add_folder("Hidden Categories", "hidden_live", plot="Restore Live TV categories you have hidden.")
         add_folder("New Zealand Streams", "nz_streams", plot="Official free-to-air New Zealand streams.\nGeo-blocked to New Zealand.")
     if action == "get_vod_categories":
         add_folder("Recently Added Movies", "recent_vod")
@@ -2161,9 +2398,12 @@ def list_categories(action: str, next_mode: str, title: str) -> None:
         name = cat.get("category_name") or "Unknown"
         cat_id = str(cat.get("category_id") or "")
         if cat_id:
+            if action == "get_live_categories" and hidden_live_is_hidden(cat_id):
+                continue
             context_items = []
             if action == "get_live_categories":
                 context_items.append(("Update Category", f'Container.Update({build_url({"mode": "live_refresh_category", "cat_id": cat_id, "title": name})})'))
+                context_items.append(("Hide Category", f'RunPlugin({build_url({"mode": "live_category_hide", "cat_id": cat_id, "title": name})})'))
                 if fav_category_is_saved("live", cat_id):
                     context_items.append(("Remove category from Bang TV favourites", f'RunPlugin({build_url({"mode": "fav_category_remove", "content_type": "live", "cat_id": cat_id})})'))
                 else:
@@ -2189,7 +2429,13 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
 
     url = xc_api_url(endpoint)
     if content_type == "live":
-        data = http_get_json_with_progress(url, "Loading Live TV channels...", timeout=25)
+        mark_live_category_opened(cat_id, title or "Live TV")
+        # For Live TV categories, show saved channels immediately even when the cache is old.
+        # The background service refreshes and compares the folder after opening/after playback,
+        # so returning from a long watch can show newly added streams without blocking the UI.
+        data = get_cached_json_any_age(url)
+        if data is None:
+            data = http_get_json_with_progress(url, "Loading Live TV channels...", timeout=25, force_refresh=True)
     else:
         data = http_get_json(url)
     if not isinstance(data, list) or not data:
@@ -2225,7 +2471,11 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
             live_meta = dict(item)
             live_meta["plot"] = epg.get("plot") or plot
             live_meta["mediatype"] = "video"
-            add_playable(name, f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts", icon, epg.get("plot") or plot, year, live_meta)
+            health = stream_health_status(stream_id)
+            extra_plot = (epg.get("plot") or plot or "")
+            if health != "Unknown":
+                extra_plot = (extra_plot + "\n\n" if extra_plot else "") + "Stream health: " + health
+            add_playable(name, f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts", icon, extra_plot, year, live_meta, live_stream_id=stream_id, live_category_id=cat_id)
         elif content_type == "vod":
             stream_id = item.get("stream_id")
             if stream_id is None:
@@ -2542,12 +2792,73 @@ def tools_menu() -> None:
     xbmcplugin.setPluginCategory(HANDLE, "Tools")
     add_action("Account status", "account_status", plot="Shows your IPTV account status, expiry date and connection limits.")
     add_action("Test connection", "connection_test", plot="Checks that Bang TV can connect to the Xtream Codes server with your saved login.")
+    add_action("Live TV Help", "live_help", plot="Explains Live TV cache, background updates, High Activity Mode, Refresh Live TV and Update Category.")
+    add_action("Server Dashboard", "live_dashboard", plot="Shows server, cache, update, change and High Activity Mode status.")
+    add_action("Auto cleanup now", "auto_cleanup", plot="Removes old cache records, old health records and trims recent channel history.")
+    add_action("Backup Bang TV settings", "backup_settings", plot="Backs up favourites, hidden categories, recent channels and Live TV update state.")
+    add_action("Restore Bang TV settings", "restore_settings", plot="Restores the saved Bang TV user backup if one exists.")
     add_folder("Cache", "cache_menu", plot="View cache size, clear cached metadata, clear EPG data, and rebuild Bang TV databases.")
     add_action("Clear favourites", "clear_favourites", plot="Removes all saved Bang TV favourites. Your login and cache are not affected.")
     add_action("Settings", "open_settings", plot="Open Bang TV settings for login, metadata, preview and add-on options.")
     add_action("Logout", "logout", plot="Logs out of Bang TV and removes your saved IPTV username and password.")
     xbmcplugin.endOfDirectory(HANDLE)
 
+
+
+def live_update_help() -> None:
+    text = """Bang TV Live TV Help
+
+Speed and cache
+
+Live TV categories now try to open from saved cache first. This means a category should load faster after it has been opened once. If the folder still feels slow, it usually means Kodi is building the visible channel list, loading logos, EPG now/next data, or that the category has not been cached yet.
+
+How background updates work
+
+When you open Live TV, Bang TV marks Live TV as recently used. The background service then checks the playlist without blocking browsing. It compares the latest server playlist with the saved cache, using category IDs and stream IDs first, then names as a backup.
+
+Normal update timing
+
+Main Live TV category list: about every 30 minutes while Live TV is being used, otherwise less often.
+
+Live TV category channels: about every 30 minutes for recently opened folders.
+
+Active or recently changed category: about every 10 minutes.
+
+Manual Refresh Live TV: anytime from the main Live TV screen.
+
+Update Category: anytime from a category context menu.
+
+High Activity Mode
+
+High Activity Mode turns on when Bang TV notices lots of playlist movement, such as new channels, removed channels, renamed streams, changed logos, changed stream URLs, or a big channel count change.
+
+When this happens, Bang TV checks changed or active categories more often for a while, so sports, match day, event, and temporary live streams are picked up faster. If things stop changing, it goes back to normal checking.
+
+After watching TV for a long time
+
+Playback is not interrupted. While you are watching, Bang TV can still keep update state in the background. When you stop playback or go back into a Live TV category, the add-on can show the cached folder quickly, then refresh the folder if the server has newer channels.
+
+Live TV Stats
+
+The Live TV Stats button shows last update time, last server check, next check, cached categories, total cached channels, active category update info, new channels, removed channels, changed channels, and whether High Activity Mode is on.
+
+Best buttons to use
+
+Use Refresh Live TV when the whole playlist looks old.
+
+Use Update Category when only one folder needs a fresh update.
+
+Use Live TV Stats when you want to check when the add-on last updated itself.
+
+Recently Watched, hidden categories, health and backups
+
+Recently Watched keeps your last 50 Live TV channels so you can jump back quickly. Hidden Categories lets you remove folders you never use from the main Live TV list and restore them later. Stream Health marks channels as working after playback and keeps a small local health history. Backup saves favourites, hidden categories, recent channels and update state into your Kodi profile.
+
+Scheduled refresh
+
+The background service checks Live TV roughly every 30 minutes while Live TV is being used, every 10 minutes in High Activity Mode, and backs off when you are not using Live TV. The manual Refresh Live TV and Update Category buttons still force an immediate update.
+"""
+    xbmcgui.Dialog().textviewer("Live TV Help", text)
 
 def cache_menu() -> None:
     xbmcplugin.setPluginCategory(HANDLE, "Tools / Cache")
@@ -2575,6 +2886,7 @@ def main_menu() -> None:
         _user, _pwd, label = get_effective_creds()
         add_action(f"Account: {label}", "account_status", plot="Shows your IPTV account status, expiry date and connection limits.")
     add_folder("Live TV", "live_categories", plot="Browse live IPTV channels with channel logos and Xtream EPG information.")
+    add_folder("Recently Watched", "recent_live", plot="Quickly reopen your recent Live TV channels.")
     add_folder("Movies", "vod_categories", plot="Browse movie categories, recently added movies, posters, descriptions, ratings and trailers.")
     add_folder("Series", "series_categories", plot="Browse TV show categories, seasons and episodes with cached metadata and episode descriptions.")
     add_folder("Search", "search", plot="Search across Bang TV Movies, TV Shows and Live TV channels.")
@@ -2599,6 +2911,18 @@ def router(paramstring: str) -> None:
         tools_menu()
     elif mode == "cache_menu":
         cache_menu()
+    elif mode == "live_help":
+        live_update_help()
+    elif mode == "live_dashboard":
+        live_dashboard()
+    elif mode == "auto_cleanup":
+        live_auto_cleanup(True)
+        xbmc.executebuiltin("Container.Refresh")
+    elif mode == "backup_settings":
+        backup_settings()
+    elif mode == "restore_settings":
+        restore_settings()
+        xbmc.executebuiltin("Container.Refresh")
     elif mode == "cache_action":
         cache_action(params.get("action") or "")
     elif mode == "account_status":
@@ -2608,7 +2932,12 @@ def router(paramstring: str) -> None:
     elif mode == "play_trailer":
         play_trailer(params.get("trailer") or "", params.get("content_type") or "", params.get("item_id") or "")
     elif mode == "play":
-        play_url(get_play_link(params.get("id") or "") or params.get("url") or "")
+        live_id = params.get("live_id") or ""
+        url = get_play_link(params.get("id") or "") or params.get("url") or ""
+        if live_id:
+            recent_live_add(params.get("name") or "Live TV", live_id, url, params.get("thumb") or "", params.get("cat_id") or "", params.get("epg_plot") or "", {"plot": params.get("epg_plot") or "", "mediatype": "video"})
+            stream_health_mark(live_id, True)
+        play_url(url)
     elif mode == "fav_add_token":
         url = get_play_link(params.get("id") or "")
         if url:
@@ -2655,6 +2984,16 @@ def router(paramstring: str) -> None:
         live_tv_stats()
     elif mode == "live_refresh_category":
         refresh_live_category(params.get("cat_id") or "", params.get("title") or "Live TV")
+    elif mode == "recent_live":
+        recent_live_menu()
+    elif mode == "hidden_live":
+        hidden_live_menu()
+    elif mode == "live_category_hide":
+        hidden_live_add(params.get("cat_id") or "", params.get("title") or "Live TV")
+        xbmc.executebuiltin("Container.Refresh")
+    elif mode == "live_category_unhide":
+        hidden_live_remove(params.get("cat_id") or "")
+        xbmc.executebuiltin("Container.Refresh")
     elif mode == "nz_streams":
         list_nz_streams()
     elif mode == "vod_categories":

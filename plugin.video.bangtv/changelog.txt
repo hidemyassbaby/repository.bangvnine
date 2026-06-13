@@ -1,3 +1,30 @@
+v1.0.11
+- Recently Watched Live TV now keeps and refreshes EPG/programme info.
+- Recent channels now show the same guide plot metadata where available.
+
+
+Version 1.0.10
+- Added Recently Watched Live TV channels.
+- Added hidden Live TV categories with restore menu.
+- Added Server Dashboard under Tools.
+- Added stream health status tracking.
+- Added backup and restore for favourites, hidden categories, recent channels and update state.
+- Added auto cleanup tool for old cache and health records.
+- Added smart update/cache settings.
+- Improved Live TV help text with cache, High Activity Mode, scheduled refresh and maintenance explanations.
+
+v1.0.9
+- Added Tools > Live TV Help explaining cache speed, background updates, High Activity Mode, Live TV Stats, Refresh Live TV and Update Category.
+- Clarified Live TV update behaviour for long viewing sessions and event day playlist changes.
+
+v1.0.8
+- Live TV categories now open from any saved cache immediately instead of blocking when the saved list is older.
+- Added active category background refresh so the folder can update after long viewing sessions.
+- The background service now keeps the current Live TV category fresh every 10 to 30 minutes depending on activity.
+- If new channels/streams are added while watching for a couple of hours, returning to the category can show the updated cached folder.
+- High activity mode is triggered by real category or playlist changes and temporarily checks more often.
+- Live TV Stats now includes active category check timing.
+
 v1.0.7
 - Added smart Live TV playlist change detection.
 - Background service now compares latest server playlist with cached playlist.
@@ -21,7 +48,6 @@ v1.0.5
 - Replaced deprecated Kodi ListItem.setInfo() calls with InfoTagVideo setter path where available.
 - Skipped broken Wikimedia SVG thumbnail artwork that caused HTTP 400 spam.
 - Added safer folder error handling so live categories fail gracefully instead of breaking the directory.
-
 [B]v1.0.0[/B]
 
 Initial release of Bang TV.

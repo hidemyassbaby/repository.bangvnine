@@ -9,5 +9,7 @@
     <setting id="background_metadata_service" type="bool" label="Background metadata service" default="true" />
     <setting id="full_metadata_on_browse" type="bool" label="Slow mode: load full TMDB metadata while browsing folders" default="false" />
     <setting id="show_epg" type="bool" label="Show live TV EPG from Xtream" default="true" />
+    <setting id="live_smart_updates" type="bool" label="Smart Live TV background updates" default="true" />
+    <setting id="live_cache_categories" type="bool" label="Cache channels inside Live TV categories" default="true" />
   </category>
 </settings>

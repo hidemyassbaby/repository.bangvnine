@@ -40,10 +40,12 @@ LIVE_UPDATE_STATE_FILE = os.path.join(PROFILE_PATH, "live_update_state.json")
 LIVE_AUTO_CHECK_SECONDS = 30 * 60
 LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
 LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD = 20
+LIVE_ACTIVE_CATEGORY_CHECK_SECONDS = 10 * 60
+LIVE_RECENT_CATEGORY_CHECK_SECONDS = 30 * 60
 
 SESSION = requests.Session()
 SESSION.headers.update({
-    "User-Agent": "Kodi BangTV/1.0.7 background-service",
+    "User-Agent": "Kodi BangTV/1.0.10 background-service",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 })
@@ -255,6 +257,36 @@ def compare_live_maps(old: Dict[str, Dict[str, str]], new: Dict[str, Dict[str, s
     return {"added": added, "removed": removed, "changed": changed, "added_count": len(added), "removed_count": len(removed), "changed_count": len(changed)}
 
 
+def refresh_live_category_background(cat_id: str, title: str, state: Dict[str, Any], cache: Dict[str, Any], force: bool = False) -> Dict[str, Any]:
+    now = int(time.time())
+    cid = str(cat_id or "")
+    if not cid:
+        return {"checked": False, "reason": "No active category"}
+    category_checks = state.get("category_checks") if isinstance(state.get("category_checks"), dict) else {}
+    high_until = int(state.get("high_activity_until", 0) or 0)
+    interval = LIVE_ACTIVE_CATEGORY_CHECK_SECONDS if high_until > now else LIVE_RECENT_CATEGORY_CHECK_SECONDS
+    last = int(category_checks.get(cid, 0) or 0)
+    if not force and now - last < interval:
+        return {"checked": False, "reason": "Category not due yet", "category_id": cid}
+    _cat_url, streams_url = live_cache_keys_for_category(cid)
+    old_items = cache.get(streams_url, {}).get("data") if isinstance(cache.get(streams_url), dict) else []
+    new_items = http_json(streams_url)
+    if not isinstance(new_items, list):
+        category_checks[cid] = now
+        state["category_checks"] = category_checks
+        return {"checked": True, "time": now, "category_id": cid, "error": "Could not read latest category channels"}
+    changes = compare_live_maps(live_signature_map(old_items, False), live_signature_map(new_items, False))
+    cache[streams_url] = {"time": now, "data": new_items}
+    category_checks[cid] = now
+    state["category_checks"] = category_checks
+    total = int(changes.get("added_count", 0) or 0) + int(changes.get("removed_count", 0) or 0) + int(changes.get("changed_count", 0) or 0)
+    if total:
+        state["high_activity_until"] = now + (2 * 60 * 60)
+        state["last_category_change"] = {"category_id": cid, "title": title or "Live TV", "time": now, "changes": changes}
+        log(f"Live TV category updated in background: {title or cid}, {total} changes")
+    return {"checked": True, "time": now, "category_id": cid, "title": title or "Live TV", "channel_changes": changes}
+
+
 def smart_live_background_check(force: bool = False) -> Dict[str, Any]:
     user, pwd = get_creds()
     if not user or not pwd:
@@ -265,15 +297,31 @@ def smart_live_background_check(force: bool = False) -> Dict[str, Any]:
     interval = LIVE_HIGH_ACTIVITY_SECONDS if high_until > now else LIVE_AUTO_CHECK_SECONDS
     live_opened_at = int(state.get("live_opened_at", 0) or 0)
     recently_opened = now - live_opened_at < 90 * 60
+    player_active = False
+    try:
+        player_active = xbmc.Player().isPlayingVideo()
+    except Exception:
+        player_active = False
+    # If the user recently opened Live TV or has been watching something, keep the active folder fresh.
+    # This is how new match-day streams can appear when the user returns from watching for a long time.
+    cache = load_api_cache()
+    active_cat = str(state.get("active_live_category_id") or "")
+    active_title = str(state.get("active_live_category_title") or "Live TV")
+    active_result = {}
+    if active_cat and (recently_opened or player_active or force):
+        active_result = refresh_live_category_background(active_cat, active_title, state, cache, force=False)
+        save_api_cache(cache)
     # Check often only when Live TV was recently used, otherwise back off to every 6 hours.
-    if not recently_opened:
+    if not recently_opened and not player_active:
         interval = 6 * 60 * 60
     if not force and now - int(state.get("last_check", 0) or 0) < interval:
-        return {"checked": False, "reason": "Not due yet"}
+        if active_result:
+            state["last_active_category_result"] = active_result
+            save_live_state(state)
+        return {"checked": False, "reason": "Main playlist not due yet", "active_category_result": active_result}
 
-    result: Dict[str, Any] = {"checked": True, "time": now, "category_changes": {}, "channel_changes": {}, "changed_category_ids": []}
+    result: Dict[str, Any] = {"checked": True, "time": now, "category_changes": {}, "channel_changes": {}, "changed_category_ids": [], "active_category_result": active_result}
     try:
-        cache = load_api_cache()
         cat_url, _unused = live_cache_keys_for_category("")
         old_categories = cache.get(cat_url, {}).get("data") if isinstance(cache.get(cat_url), dict) else []
         new_categories = http_json(cat_url)
@@ -512,7 +560,8 @@ def run() -> None:
         queue = read_queue()
         if not queue:
             preload_startup_data()
-            smart_live_background_check(False)
+            if setting_bool("live_smart_updates", True):
+                smart_live_background_check(False)
             monitor.waitForAbort(IDLE_SLEEP)
             continue
         # Current page metadata is more important than startup EPG/channel preload.
