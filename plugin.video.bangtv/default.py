@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.9.6
+Version 1.9.7
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -42,7 +42,7 @@ DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.9.6",
+    "User-Agent": "Kodi BangTV/1.9.7",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -63,7 +63,7 @@ EPG_TTL_SECONDS = 6 * 60 * 60
 PAGE_SIZE = 20
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
 ADDON_ICON = xbmcvfs.translatePath(ADDON.getAddonInfo("icon")) or "icon.png"
-ADDON_VERSION = ADDON.getAddonInfo("version") or "1.9.6"
+ADDON_VERSION = ADDON.getAddonInfo("version") or "1.9.7"
 VERSION_MARKER_FILE = os.path.join(PROFILE_PATH, "installed_version.txt")
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 PLAY_LINKS_FILE = os.path.join(PROFILE_PATH, "play_links.json")
@@ -803,6 +803,131 @@ def nz_epg_map(epg_url: str) -> Dict[str, Dict[str, str]]:
         metadata_cache_set("nz_epg", "all", result)
     return result
 
+
+
+
+def xtream_xmltv_url() -> str:
+    user, pwd, _label = get_effective_creds()
+    if not user or not pwd:
+        return ""
+    return f"{SERVER}/xmltv.php?username={quote(user)}&password={quote(pwd)}"
+
+
+def norm_epg_key(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def xmltv_epg_map(epg_url: str, cache_key: str = "live_xmltv") -> Dict[str, Dict[str, str]]:
+    """Build a reusable XMLTV Now/Next map, the same style used by New Zealand Streams."""
+    if not epg_url or not setting_bool("show_epg", True):
+        return {}
+    cached = metadata_cache_get("epg_xmltv", cache_key, ttl=EPG_TTL_SECONDS)
+    if cached:
+        return cached
+    raw = http_get_bytes(epg_url, timeout=30, use_cache=True, ttl=EPG_TTL_SECONDS, silent=True)
+    if not raw:
+        return {}
+    try:
+        if epg_url.endswith(".gz") or raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+    except Exception:
+        pass
+    try:
+        root = ET.fromstring(raw)
+    except Exception as exc:
+        log(f"XMLTV EPG parse failed: {exc}", xbmc.LOGWARNING)
+        return {}
+
+    channel_names: Dict[str, List[str]] = {}
+    for channel in root.findall("channel"):
+        ch_id = channel.get("id") or ""
+        if not ch_id:
+            continue
+        names = []
+        for dn in channel.findall("display-name"):
+            if dn.text and dn.text.strip():
+                names.append(dn.text.strip())
+        channel_names[ch_id] = names
+
+    now_ts = int(time.time())
+    by_channel: Dict[str, List[Tuple[int, int, str, str]]] = {}
+    for prog in root.findall("programme"):
+        ch = prog.get("channel") or ""
+        start = parse_xmltv_time(prog.get("start"))
+        stop = parse_xmltv_time(prog.get("stop"))
+        if not ch or start is None or stop is None:
+            continue
+        if stop < now_ts - 60:
+            continue
+        title = xml_text(prog, "title")
+        desc = xml_text(prog, "desc")
+        by_channel.setdefault(ch, []).append((start, stop, title, desc))
+
+    result: Dict[str, Dict[str, str]] = {}
+    for ch, rows in by_channel.items():
+        rows.sort(key=lambda r: r[0])
+        current = None
+        nxt = None
+        for row in rows:
+            if row[0] <= now_ts <= row[1]:
+                current = row
+            elif row[0] > now_ts and nxt is None:
+                nxt = row
+            if current and nxt:
+                break
+        lines: List[str] = []
+        if current:
+            lines.append(f"Now: {current[2]} ({format_local_time(current[0])} - {format_local_time(current[1])})")
+            if current[3]:
+                lines.append(current[3])
+        if nxt:
+            if lines:
+                lines.append("")
+            lines.append(f"Next: {nxt[2]} ({format_local_time(nxt[0])})")
+        if not lines:
+            continue
+        value = {"plot": "\n".join(lines)}
+        keys = [ch] + channel_names.get(ch, [])
+        for key in keys:
+            if key:
+                result[key] = value
+                nkey = norm_epg_key(key)
+                if nkey:
+                    result[nkey] = value
+    if result:
+        metadata_cache_set("epg_xmltv", cache_key, result)
+    return result
+
+
+def live_item_epg_from_map(item: Dict[str, Any], epg_map: Dict[str, Dict[str, str]]) -> Dict[str, str]:
+    if not epg_map:
+        return {}
+    name = item.get("name") or ""
+    candidates = [
+        item.get("epg_channel_id"),
+        item.get("tvg_id"),
+        item.get("channel_id"),
+        item.get("stream_id"),
+        name,
+    ]
+    # Some providers append quality tags to channel names while XMLTV keeps the clean name.
+    clean_name = re.sub(r"\b(FHD|HD|SD|UHD|4K|HEVC|H265|H264|1080P|720P)\b", "", str(name or ""), flags=re.I)
+    clean_name = " ".join(clean_name.replace("|", " ").split())
+    candidates.append(clean_name)
+    for key in candidates:
+        if key in (None, ""):
+            continue
+        direct = epg_map.get(str(key))
+        if direct:
+            return direct
+        normed = epg_map.get(norm_epg_key(key))
+        if normed:
+            return normed
+    return {}
 
 def nz_play_url(item: Dict[str, Any]) -> str:
     url = str(item.get("url") or "")
@@ -1579,10 +1704,13 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
     page = safe_page(page)
     items, has_next = paged_items(all_items, page)
     preview_meta: Dict[str, Dict[str, Any]] = {}
+    live_xmltv_epg: Dict[str, Dict[str, str]] = {}
     if content_type == "vod":
         preview_meta = batch_preview_metadata("vod", [item.get("stream_id") for item in items], PAGE_SIZE)
     elif content_type == "series":
         preview_meta = batch_preview_metadata("series", [item.get("series_id") for item in items], PAGE_SIZE)
+    elif content_type == "live":
+        live_xmltv_epg = xmltv_epg_map(xtream_xmltv_url(), "xtream_live")
 
     user, pwd, _label = get_effective_creds()
     for item in items:
@@ -1594,8 +1722,13 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
             stream_id = item.get("stream_id")
             if stream_id is None:
                 continue
-            epg = live_epg(stream_id)
-            add_playable(name, f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts", icon, epg.get("plot") or plot, year, item)
+            # Prefer the same XMLTV Now/Next method used by New Zealand Streams because it works
+            # consistently in more Kodi skins/themes. Fall back to Xtream short EPG if XMLTV has no match.
+            epg = live_item_epg_from_map(item, live_xmltv_epg) or live_epg(stream_id)
+            live_meta = dict(item)
+            live_meta["plot"] = epg.get("plot") or plot
+            live_meta["mediatype"] = "video"
+            add_playable(name, f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts", icon, epg.get("plot") or plot, year, live_meta)
         elif content_type == "vod":
             stream_id = item.get("stream_id")
             if stream_id is None:
