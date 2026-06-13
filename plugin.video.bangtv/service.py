@@ -36,10 +36,14 @@ MAX_PER_CYCLE = 30
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 CACHE_FILE = os.path.join(PROFILE_PATH, "api_cache.json")
 CACHE_TTL_SECONDS = 10 * 60
+LIVE_UPDATE_STATE_FILE = os.path.join(PROFILE_PATH, "live_update_state.json")
+LIVE_AUTO_CHECK_SECONDS = 30 * 60
+LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
+LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD = 20
 
 SESSION = requests.Session()
 SESSION.headers.update({
-    "User-Agent": "Kodi BangTV/1.0.3 background-service",
+    "User-Agent": "Kodi BangTV/1.0.7 background-service",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 })
@@ -181,6 +185,140 @@ def save_api_cache(cache: Dict[str, Any]) -> None:
             json.dump(cache, fh, ensure_ascii=False)
     except Exception as exc:
         log(f"api cache save failed: {exc}", xbmc.LOGWARNING)
+
+
+def load_live_state() -> Dict[str, Any]:
+    try:
+        if not os.path.exists(LIVE_UPDATE_STATE_FILE):
+            return {}
+        with open(LIVE_UPDATE_STATE_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_live_state(state: Dict[str, Any]) -> None:
+    try:
+        with open(LIVE_UPDATE_STATE_FILE, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, ensure_ascii=False)
+    except Exception as exc:
+        log(f"live state save failed: {exc}", xbmc.LOGWARNING)
+
+
+def live_cache_keys_for_category(cat_id: str) -> Tuple[str, str]:
+    cat_url = xc_api_url("player_api.php?action=get_live_categories")
+    streams_url = xc_api_url(f"player_api.php?action=get_live_streams&category_id={quote(cat_id)}")
+    return cat_url, streams_url
+
+
+def live_item_id(item: Dict[str, Any], category: bool = False) -> str:
+    if not isinstance(item, dict):
+        return ""
+    if category:
+        return str(item.get("category_id") or item.get("id") or item.get("category_name") or item.get("name") or "").strip()
+    return str(item.get("stream_id") or item.get("id") or item.get("name") or "").strip()
+
+
+def live_item_signature(item: Dict[str, Any], category: bool = False) -> Dict[str, str]:
+    if not isinstance(item, dict):
+        return {}
+    if category:
+        return {"name": str(item.get("category_name") or item.get("name") or ""), "parent_id": str(item.get("parent_id") or "")}
+    return {
+        "name": str(item.get("name") or ""),
+        "category_id": str(item.get("category_id") or ""),
+        "logo": str(item.get("stream_icon") or item.get("cover") or item.get("cover_big") or ""),
+        "epg_channel_id": str(item.get("epg_channel_id") or item.get("tvg_id") or ""),
+    }
+
+
+def live_signature_map(items: Any, category: bool = False) -> Dict[str, Dict[str, str]]:
+    result: Dict[str, Dict[str, str]] = {}
+    if not isinstance(items, list):
+        return result
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_id = live_item_id(item, category)
+        if item_id:
+            result[item_id] = live_item_signature(item, category)
+    return result
+
+
+def compare_live_maps(old: Dict[str, Dict[str, str]], new: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
+    old_ids = set(old.keys())
+    new_ids = set(new.keys())
+    added = sorted(new_ids - old_ids)
+    removed = sorted(old_ids - new_ids)
+    changed = sorted([item_id for item_id in (old_ids & new_ids) if old.get(item_id) != new.get(item_id)])
+    return {"added": added, "removed": removed, "changed": changed, "added_count": len(added), "removed_count": len(removed), "changed_count": len(changed)}
+
+
+def smart_live_background_check(force: bool = False) -> Dict[str, Any]:
+    user, pwd = get_creds()
+    if not user or not pwd:
+        return {"checked": False, "reason": "Not logged in"}
+    now = int(time.time())
+    state = load_live_state()
+    high_until = int(state.get("high_activity_until", 0) or 0)
+    interval = LIVE_HIGH_ACTIVITY_SECONDS if high_until > now else LIVE_AUTO_CHECK_SECONDS
+    live_opened_at = int(state.get("live_opened_at", 0) or 0)
+    recently_opened = now - live_opened_at < 90 * 60
+    # Check often only when Live TV was recently used, otherwise back off to every 6 hours.
+    if not recently_opened:
+        interval = 6 * 60 * 60
+    if not force and now - int(state.get("last_check", 0) or 0) < interval:
+        return {"checked": False, "reason": "Not due yet"}
+
+    result: Dict[str, Any] = {"checked": True, "time": now, "category_changes": {}, "channel_changes": {}, "changed_category_ids": []}
+    try:
+        cache = load_api_cache()
+        cat_url, _unused = live_cache_keys_for_category("")
+        old_categories = cache.get(cat_url, {}).get("data") if isinstance(cache.get(cat_url), dict) else []
+        new_categories = http_json(cat_url)
+        if isinstance(new_categories, list):
+            result["category_changes"] = compare_live_maps(live_signature_map(old_categories, True), live_signature_map(new_categories, True))
+            cache[cat_url] = {"time": now, "data": new_categories}
+        all_streams_url = xc_api_url("player_api.php?action=get_live_streams")
+        old_streams = cache.get(all_streams_url, {}).get("data") if isinstance(cache.get(all_streams_url), dict) else []
+        new_streams = http_json(all_streams_url)
+        if isinstance(new_streams, list):
+            changes = compare_live_maps(live_signature_map(old_streams, False), live_signature_map(new_streams, False))
+            result["channel_changes"] = changes
+            cache[all_streams_url] = {"time": now, "data": new_streams}
+            old_map = live_signature_map(old_streams, False)
+            new_map = live_signature_map(new_streams, False)
+            changed_cat_ids = set()
+            for sid in changes.get("added", []) + changes.get("changed", []):
+                cid = (new_map.get(sid) or {}).get("category_id")
+                if cid:
+                    changed_cat_ids.add(str(cid))
+            for sid in changes.get("removed", []):
+                cid = (old_map.get(sid) or {}).get("category_id")
+                if cid:
+                    changed_cat_ids.add(str(cid))
+            result["changed_category_ids"] = sorted(changed_cat_ids)
+            total_changes = int(changes.get("added_count", 0)) + int(changes.get("removed_count", 0)) + int(changes.get("changed_count", 0))
+            if total_changes >= LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD:
+                state["high_activity_until"] = now + (3 * 60 * 60)
+            for cid in result["changed_category_ids"][:30]:
+                _cu, streams_url = live_cache_keys_for_category(cid)
+                cache[streams_url] = {"time": now, "data": [item for item in new_streams if isinstance(item, dict) and str(item.get("category_id") or "") == str(cid)]}
+        else:
+            result["error"] = "Could not read latest channel list"
+        save_api_cache(cache)
+    except Exception as exc:
+        result["error"] = str(exc)
+        log(f"smart live background check failed: {exc}", xbmc.LOGWARNING)
+    state["last_check"] = now
+    state["last_result"] = result
+    save_live_state(state)
+    ch = result.get("channel_changes") if isinstance(result.get("channel_changes"), dict) else {}
+    total = int(ch.get("added_count", 0) or 0) + int(ch.get("removed_count", 0) or 0) + int(ch.get("changed_count", 0) or 0)
+    if total:
+        log(f"Live TV playlist updated in background: {total} channel changes")
+    return result
 
 
 def cache_http_json(url: str, timeout: int = REQUEST_TIMEOUT) -> Any:
@@ -374,6 +512,7 @@ def run() -> None:
         queue = read_queue()
         if not queue:
             preload_startup_data()
+            smart_live_background_check(False)
             monitor.waitForAbort(IDLE_SLEEP)
             continue
         # Current page metadata is more important than startup EPG/channel preload.

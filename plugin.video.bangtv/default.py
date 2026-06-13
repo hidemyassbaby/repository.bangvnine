@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.4
+Version 1.0.7
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -42,7 +42,7 @@ DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.4",
+    "User-Agent": "Kodi BangTV/1.0.7",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -63,10 +63,14 @@ EPG_TTL_SECONDS = 6 * 60 * 60
 PAGE_SIZE = 20
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
 ADDON_ICON = xbmcvfs.translatePath(ADDON.getAddonInfo("icon")) or "icon.png"
-ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.4"
+ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.7"
 VERSION_MARKER_FILE = os.path.join(PROFILE_PATH, "installed_version.txt")
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 PLAY_LINKS_FILE = os.path.join(PROFILE_PATH, "play_links.json")
+LIVE_UPDATE_STATE_FILE = os.path.join(PROFILE_PATH, "live_update_state.json")
+LIVE_AUTO_CHECK_SECONDS = 30 * 60
+LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
+LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD = 20
 
 
 
@@ -693,13 +697,232 @@ def clear_live_tv_cache(show_notice: bool = True) -> None:
 
 
 def refresh_live_tv() -> None:
-    clear_live_tv_cache(True)
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress.create(ADDON_NAME, "Refresh Live TV")
+        progress.update(5, "Starting smart playlist refresh...")
+        clear_live_tv_cache(False)
+        smart_live_check(force=True, show_notice=True, progress=progress)
+        progress.update(100, "Done")
+        xbmc.sleep(250)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
     xbmc.executebuiltin("Container.Refresh")
 
 def live_cache_keys_for_category(cat_id: str) -> Tuple[str, str]:
     cat_url = xc_api_url("player_api.php?action=get_live_categories")
     streams_url = xc_api_url(f"player_api.php?action=get_live_streams&category_id={quote(cat_id)}")
     return cat_url, streams_url
+
+
+def load_live_update_state() -> Dict[str, Any]:
+    try:
+        if not os.path.exists(LIVE_UPDATE_STATE_FILE):
+            return {}
+        with open(LIVE_UPDATE_STATE_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        log(f"Live update state read failed: {exc}", xbmc.LOGWARNING)
+        return {}
+
+
+def save_live_update_state(state: Dict[str, Any]) -> None:
+    try:
+        with open(LIVE_UPDATE_STATE_FILE, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, ensure_ascii=False)
+    except Exception as exc:
+        log(f"Live update state save failed: {exc}", xbmc.LOGWARNING)
+
+
+def live_item_id(item: Dict[str, Any], category: bool = False) -> str:
+    if not isinstance(item, dict):
+        return ""
+    if category:
+        return str(item.get("category_id") or item.get("id") or item.get("category_name") or item.get("name") or "").strip()
+    return str(item.get("stream_id") or item.get("id") or item.get("name") or "").strip()
+
+
+def live_item_signature(item: Dict[str, Any], category: bool = False) -> Dict[str, str]:
+    if not isinstance(item, dict):
+        return {}
+    if category:
+        return {
+            "name": str(item.get("category_name") or item.get("name") or ""),
+            "parent_id": str(item.get("parent_id") or ""),
+        }
+    return {
+        "name": str(item.get("name") or ""),
+        "category_id": str(item.get("category_id") or ""),
+        "logo": str(item.get("stream_icon") or item.get("cover") or item.get("cover_big") or ""),
+        "epg_channel_id": str(item.get("epg_channel_id") or item.get("tvg_id") or ""),
+    }
+
+
+def live_signature_map(items: Any, category: bool = False) -> Dict[str, Dict[str, str]]:
+    result: Dict[str, Dict[str, str]] = {}
+    if not isinstance(items, list):
+        return result
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_id = live_item_id(item, category)
+        if item_id:
+            result[item_id] = live_item_signature(item, category)
+    return result
+
+
+def compare_live_maps(old: Dict[str, Dict[str, str]], new: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
+    old_ids = set(old.keys())
+    new_ids = set(new.keys())
+    added = sorted(new_ids - old_ids)
+    removed = sorted(old_ids - new_ids)
+    changed = sorted([item_id for item_id in (old_ids & new_ids) if old.get(item_id) != new.get(item_id)])
+    return {"added": added, "removed": removed, "changed": changed, "added_count": len(added), "removed_count": len(removed), "changed_count": len(changed)}
+
+
+def live_stats_summary() -> Dict[str, Any]:
+    cache = load_cache()
+    state = load_live_update_state()
+    cat_url, _unused = live_cache_keys_for_category("")
+    categories_entry = cache.get(cat_url) if isinstance(cache.get(cat_url), dict) else {}
+    categories = categories_entry.get("data") if isinstance(categories_entry, dict) else []
+    if not isinstance(categories, list):
+        categories = []
+    total_channels = 0
+    category_cache_count = 0
+    newest_update = cache_entry_time(cache, cat_url)
+    oldest_update = newest_update
+    for cat in categories:
+        cat_id = str(cat.get("category_id") or "") if isinstance(cat, dict) else ""
+        if not cat_id:
+            continue
+        _cat_url, streams_url = live_cache_keys_for_category(cat_id)
+        entry = cache.get(streams_url)
+        if isinstance(entry, dict):
+            items = entry.get("data")
+            if isinstance(items, list):
+                total_channels += len(items)
+                category_cache_count += 1
+            ts = int(entry.get("time", 0) or 0)
+            if ts:
+                newest_update = max(newest_update, ts) if newest_update else ts
+                oldest_update = min(oldest_update, ts) if oldest_update else ts
+    now = int(time.time())
+    last_check = int(state.get("last_check", 0) or 0)
+    high_until = int(state.get("high_activity_until", 0) or 0)
+    interval = LIVE_HIGH_ACTIVITY_SECONDS if high_until > now else LIVE_AUTO_CHECK_SECONDS
+    next_check = last_check + interval if last_check else 0
+    age = now - newest_update if newest_update else 0
+    status = "Fresh" if newest_update and age <= LIVE_AUTO_CHECK_SECONDS else ("Old" if newest_update else "No cache yet")
+    last_result = state.get("last_result") if isinstance(state.get("last_result"), dict) else {}
+    return {
+        "categories": categories,
+        "total_categories": len(categories),
+        "cached_categories": category_cache_count,
+        "total_channels": total_channels,
+        "newest_update": newest_update,
+        "oldest_update": oldest_update,
+        "last_check": last_check,
+        "next_check": next_check,
+        "status": status,
+        "background_enabled": True,
+        "high_activity": high_until > now,
+        "last_result": last_result,
+    }
+
+
+def smart_live_check(force: bool = False, show_notice: bool = False, progress: Optional[Any] = None) -> Dict[str, Any]:
+    now = int(time.time())
+    state = load_live_update_state()
+    high_until = int(state.get("high_activity_until", 0) or 0)
+    interval = LIVE_HIGH_ACTIVITY_SECONDS if high_until > now else LIVE_AUTO_CHECK_SECONDS
+    if not force and now - int(state.get("last_check", 0) or 0) < interval:
+        return state.get("last_result") if isinstance(state.get("last_result"), dict) else {"checked": False, "reason": "Not due yet"}
+
+    result: Dict[str, Any] = {"checked": True, "time": now, "category_changes": {}, "channel_changes": {}, "changed_category_ids": []}
+    try:
+        if progress:
+            progress.update(15, "Checking latest Live TV categories...")
+        cat_url, _unused = live_cache_keys_for_category("")
+        cache = load_cache()
+        old_categories = cache.get(cat_url, {}).get("data") if isinstance(cache.get(cat_url), dict) else []
+        new_categories = http_get_json(cat_url, timeout=25, use_cache=False, silent=True)
+        if isinstance(new_categories, list):
+            result["category_changes"] = compare_live_maps(live_signature_map(old_categories, True), live_signature_map(new_categories, True))
+            cache[cat_url] = {"time": now, "data": new_categories}
+        else:
+            new_categories = old_categories if isinstance(old_categories, list) else []
+
+        if progress:
+            progress.update(45, "Checking latest Live TV channels...")
+        all_streams_url = xc_api_url("player_api.php?action=get_live_streams")
+        old_streams = cache.get(all_streams_url, {}).get("data") if isinstance(cache.get(all_streams_url), dict) else []
+        new_streams = http_get_json(all_streams_url, timeout=35, use_cache=False, silent=True)
+        if isinstance(new_streams, list):
+            channel_changes = compare_live_maps(live_signature_map(old_streams, False), live_signature_map(new_streams, False))
+            result["channel_changes"] = channel_changes
+            cache[all_streams_url] = {"time": now, "data": new_streams}
+            changed_cat_ids = set()
+            old_map = live_signature_map(old_streams, False)
+            new_map = live_signature_map(new_streams, False)
+            for sid in channel_changes.get("added", []) + channel_changes.get("changed", []):
+                cid = (new_map.get(sid) or {}).get("category_id")
+                if cid:
+                    changed_cat_ids.add(str(cid))
+            for sid in channel_changes.get("removed", []):
+                cid = (old_map.get(sid) or {}).get("category_id")
+                if cid:
+                    changed_cat_ids.add(str(cid))
+            result["changed_category_ids"] = sorted(changed_cat_ids)
+            total_changes = int(channel_changes.get("added_count", 0)) + int(channel_changes.get("removed_count", 0)) + int(channel_changes.get("changed_count", 0))
+            if total_changes >= LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD:
+                state["high_activity_until"] = now + (3 * 60 * 60)
+            # Update cached category folders for changed categories only.
+            if progress:
+                progress.update(70, "Updating changed categories...")
+            for index, cid in enumerate(result["changed_category_ids"][:30]):
+                _cu, streams_url = live_cache_keys_for_category(cid)
+                items = [item for item in new_streams if isinstance(item, dict) and str(item.get("category_id") or "") == str(cid)]
+                cache[streams_url] = {"time": now, "data": items}
+                if progress and result["changed_category_ids"]:
+                    progress.update(70 + min(20, int((index + 1) * 20 / max(1, len(result["changed_category_ids"])))), f"Updated category {index + 1} of {len(result['changed_category_ids'])}")
+        else:
+            result["error"] = "Could not read latest channel list"
+        save_cache(cache)
+    except Exception as exc:
+        result["error"] = str(exc)
+        log(f"Smart Live TV check failed: {exc}", xbmc.LOGWARNING)
+
+    state["last_check"] = now
+    state["last_result"] = result
+    save_live_update_state(state)
+    if show_notice:
+        ch = result.get("channel_changes") if isinstance(result.get("channel_changes"), dict) else {}
+        added = int(ch.get("added_count", 0) or 0)
+        removed = int(ch.get("removed_count", 0) or 0)
+        changed = int(ch.get("changed_count", 0) or 0)
+        if added or removed or changed:
+            notify(f"Live TV updated: +{added}, -{removed}, changed {changed}")
+        elif result.get("error"):
+            notify("Live TV check failed, using saved list", icon=xbmcgui.NOTIFICATION_WARNING)
+        else:
+            notify("Live TV already up to date")
+    return result
+
+
+def maybe_start_live_background_check() -> None:
+    try:
+        # Kodi plugin calls are short lived, so use the service for real background checks.
+        # This marker lets service.py know the user opened Live TV recently.
+        state = load_live_update_state()
+        state["live_opened_at"] = int(time.time())
+        save_live_update_state(state)
+    except Exception:
+        pass
 
 
 def cache_entry_time(cache: Dict[str, Any], key: str) -> int:
@@ -722,48 +945,31 @@ def nice_time(ts: int) -> str:
 
 
 def live_tv_stats() -> None:
-    cache = load_cache()
-    cat_url, _unused = live_cache_keys_for_category("")
-    categories_entry = cache.get(cat_url) if isinstance(cache.get(cat_url), dict) else {}
-    categories = categories_entry.get("data") if isinstance(categories_entry, dict) else []
-    if not isinstance(categories, list):
-        categories = []
-
-    total_channels = 0
-    category_cache_count = 0
-    newest_update = cache_entry_time(cache, cat_url)
-    oldest_update = newest_update
-    for cat in categories:
-        cat_id = str(cat.get("category_id") or "") if isinstance(cat, dict) else ""
-        if not cat_id:
-            continue
-        _cat_url, streams_url = live_cache_keys_for_category(cat_id)
-        entry = cache.get(streams_url)
-        if isinstance(entry, dict):
-            items = entry.get("data")
-            if isinstance(items, list):
-                total_channels += len(items)
-                category_cache_count += 1
-            ts = int(entry.get("time", 0) or 0)
-            if ts:
-                newest_update = max(newest_update, ts) if newest_update else ts
-                oldest_update = min(oldest_update, ts) if oldest_update else ts
-
-    now = int(time.time())
-    age = now - newest_update if newest_update else 0
-    status = "Fresh" if newest_update and age <= CACHE_TTL_SECONDS else ("Old" if newest_update else "No cache yet")
-    next_check = newest_update + CACHE_TTL_SECONDS if newest_update else 0
+    stats = live_stats_summary()
+    result = stats.get("last_result") if isinstance(stats.get("last_result"), dict) else {}
+    ch = result.get("channel_changes") if isinstance(result.get("channel_changes"), dict) else {}
+    cc = result.get("category_changes") if isinstance(result.get("category_changes"), dict) else {}
     lines = [
-        f"Last updated: {nice_time(newest_update)}",
-        f"Oldest category cache: {nice_time(oldest_update)}",
-        f"Next auto check: {nice_time(next_check)}" if next_check else "Next auto check: When Live TV is opened",
-        f"Total categories: {len(categories)}",
-        f"Cached categories: {category_cache_count}",
-        f"Total cached channels: {total_channels}",
-        f"Cache status: {status}",
+        f"Last updated: {nice_time(int(stats.get('newest_update', 0) or 0))}",
+        f"Oldest category cache: {nice_time(int(stats.get('oldest_update', 0) or 0))}",
+        f"Last server check: {nice_time(int(stats.get('last_check', 0) or 0))}",
+        f"Next auto check: {nice_time(int(stats.get('next_check', 0) or 0)) if stats.get('next_check') else 'When Live TV is opened'}",
+        f"Total categories: {stats.get('total_categories', 0)}",
+        f"Cached categories: {stats.get('cached_categories', 0)}",
+        f"Total cached channels: {stats.get('total_channels', 0)}",
+        f"New channels found: {int(ch.get('added_count', 0) or 0)}",
+        f"Removed channels: {int(ch.get('removed_count', 0) or 0)}",
+        f"Changed channels: {int(ch.get('changed_count', 0) or 0)}",
+        f"New categories found: {int(cc.get('added_count', 0) or 0)}",
+        f"Removed categories: {int(cc.get('removed_count', 0) or 0)}",
+        f"Changed categories: {int(cc.get('changed_count', 0) or 0)}",
+        f"Cache status: {stats.get('status', 'Unknown')}",
+        f"High activity mode: {'On' if stats.get('high_activity') else 'Off'}",
+        "Background updates: Enabled",
     ]
+    if result.get("error"):
+        lines.append(f"Last check message: {result.get('error')}")
     xbmcgui.Dialog().textviewer("Live TV Stats", "\n".join(lines))
-
 
 def clear_live_category_cache(cat_id: str, show_notice: bool = True) -> None:
     try:
@@ -801,9 +1007,17 @@ def refresh_live_category(cat_id: str, title: str = "") -> None:
         progress.update(35, "Contacting server for latest channels...")
         data = http_get_json(url, timeout=30, use_cache=False, silent=False)
         if data is not None:
+            progress.update(65, "Comparing with saved category...")
+            cache = load_cache()
+            old_data = cache.get(url, {}).get("data") if isinstance(cache.get(url), dict) else []
+            changes = compare_live_maps(live_signature_map(old_data, False), live_signature_map(data, False)) if isinstance(data, list) else {}
             progress.update(75, "Saving latest channel list...")
             save_json_to_cache(url, data)
             if isinstance(data, list):
+                state = load_live_update_state()
+                state["last_check"] = int(time.time())
+                state["last_result"] = {"checked": True, "time": int(time.time()), "category_update": str(cat_id), "channel_changes": changes, "changed_category_ids": [str(cat_id)]}
+                save_live_update_state(state)
                 progress.update(95, f"Loaded {len(data)} channels")
             else:
                 progress.update(95, "Latest category data saved")
@@ -1929,6 +2143,7 @@ def list_categories(action: str, next_mode: str, title: str) -> None:
     xbmcplugin.setContent(HANDLE, "videos")
     url = xc_api_url(f"player_api.php?action={action}")
     if action == "get_live_categories":
+        maybe_start_live_background_check()
         data = http_get_json_with_progress(url, "Loading Live TV categories...", timeout=25)
     else:
         data = http_get_json(url)
@@ -1937,7 +2152,7 @@ def list_categories(action: str, next_mode: str, title: str) -> None:
         xbmcplugin.endOfDirectory(HANDLE)
         return
     if action == "get_live_categories":
-        add_action("Live TV Stats", "live_stats", plot="Show when Live TV was last updated, cache status, category count and cached channel count.")
+        add_action("Live TV Stats", "live_stats", plot="Show last update, next check, changed channels, changed categories and cache status.")
         add_action("Refresh Live TV", "live_refresh", plot="Force Bang TV to get the latest Live TV categories, channels and EPG from the server.")
         add_folder("New Zealand Streams", "nz_streams", plot="Official free-to-air New Zealand streams.\nGeo-blocked to New Zealand.")
     if action == "get_vod_categories":

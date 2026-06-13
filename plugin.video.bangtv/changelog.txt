@@ -1,3 +1,12 @@
+v1.0.7
+- Added smart Live TV playlist change detection.
+- Background service now compares latest server playlist with cached playlist.
+- Detects new, removed and changed Live TV channels and categories.
+- Updates changed category caches without refreshing the whole add-on where possible.
+- Live TV Stats now shows last server check, next auto check, new/removed/changed channels, changed categories, cache status and high activity mode.
+- Refresh Live TV now performs a smart forced refresh with progress dialog.
+- Category Update now compares saved channels, saves stats and opens the refreshed category.
+
 v1.0.6
 - Added Live TV category favourites.
 - Kept Live TV Stats and Refresh Live TV only on the main Live TV screen.
