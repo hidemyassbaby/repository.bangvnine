@@ -1,0 +1,22 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en_GB\n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgctxt "#30000"
+msgid "Bang TV"
+msgstr "Bang TV"
+
+msgctxt "#30010"
+msgid "Login"
+msgstr "Login"
+
+msgctxt "#30013"
+msgid "Username"
+msgstr "Username"
+
+msgctxt "#30014"
+msgid "Password"
+msgstr "Password"

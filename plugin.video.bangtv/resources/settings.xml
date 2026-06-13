@@ -1,0 +1,13 @@
+<settings>
+  <category label="Bang TV Settings">
+    <setting id="username" type="text" label="Username" default="" />
+    <setting id="password" type="text" label="Password" option="hidden" default="" />
+    <setting id="show_account_status" type="bool" label="Show account status on main menu" default="true" />
+    <setting id="enhanced_metadata" type="bool" label="Show movie and TV metadata / trailers" default="true" />
+    <setting id="tmdb_proxy_enabled" type="bool" label="Use Bang TV Cloudflare TMDB metadata proxy" default="true" />
+    <setting id="preview_metadata_on_browse" type="bool" label="Show cached preview details while browsing folders" default="true" />
+    <setting id="background_metadata_service" type="bool" label="Background metadata service" default="true" />
+    <setting id="full_metadata_on_browse" type="bool" label="Slow mode: load full TMDB metadata while browsing folders" default="false" />
+    <setting id="show_epg" type="bool" label="Show live TV EPG from Xtream" default="true" />
+  </category>
+</settings>

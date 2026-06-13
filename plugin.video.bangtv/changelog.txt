@@ -1,0 +1,34 @@
+[B]v1.0.0[/B]
+
+Initial release of Bang TV.
+Added Xtream Codes support.
+Added Live TV, Movies and TV Shows.
+Added TMDB metadata support.
+Added trailers for Movies and TV Shows.
+Added posters and fanart.
+Added EPG support with local timezone display.
+Added channel logos.
+Added New Zealand Streams.
+Added metadata caching.
+Added artwork caching.
+Added API caching.
+Added background preload service.
+Added favourites support.
+Added continue watching support.
+Added Tools menu.
+Added cache management.
+Added cache statistics.
+Added Build Full Metadata Cache.
+Added database rebuilding.
+Added account status and connection testing.
+Added settings and logout support.
+Added background metadata service.
+Added season and episode metadata support.
+Added progress indicators and confirmation dialogs.
+Improved browsing performance.
+Reduced loading times.
+Added add-on branding throughout.
+Added version refresh support.
+Numerous bug fixes and performance improvements.
+
+[B]Thank you for using Bang TV![/B]
