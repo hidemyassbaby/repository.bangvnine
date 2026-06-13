@@ -39,7 +39,7 @@ CACHE_TTL_SECONDS = 10 * 60
 
 SESSION = requests.Session()
 SESSION.headers.update({
-    "User-Agent": "Kodi BangTV/1.9.3 background-service",
+    "User-Agent": "Kodi BangTV/1.0.3 background-service",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 })

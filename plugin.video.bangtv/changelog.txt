@@ -1,3 +1,18 @@
+v1.0.6
+- Added Live TV category favourites.
+- Kept Live TV Stats and Refresh Live TV only on the main Live TV screen.
+
+v1.0.5
+- Renamed Live TV category context menu item to Update Category.
+- Added detailed progress dialog while a single category updates, then opens that category automatically.
+
+
+[1.0.3]
+- Fixed SQLite cache clear VACUUM errors by running VACUUM outside transactions.
+- Replaced deprecated Kodi ListItem.setInfo() calls with InfoTagVideo setter path where available.
+- Skipped broken Wikimedia SVG thumbnail artwork that caused HTTP 400 spam.
+- Added safer folder error handling so live categories fail gracefully instead of breaking the directory.
+
 [B]v1.0.0[/B]
 
 Initial release of Bang TV.

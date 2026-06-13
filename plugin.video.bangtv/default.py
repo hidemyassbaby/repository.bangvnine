@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.9.7
+Version 1.0.4
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -42,7 +42,7 @@ DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.9.7",
+    "User-Agent": "Kodi BangTV/1.0.4",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -63,7 +63,7 @@ EPG_TTL_SECONDS = 6 * 60 * 60
 PAGE_SIZE = 20
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
 ADDON_ICON = xbmcvfs.translatePath(ADDON.getAddonInfo("icon")) or "icon.png"
-ADDON_VERSION = ADDON.getAddonInfo("version") or "1.9.7"
+ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.4"
 VERSION_MARKER_FILE = os.path.join(PROFILE_PATH, "installed_version.txt")
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 PLAY_LINKS_FILE = os.path.join(PROFILE_PATH, "play_links.json")
@@ -393,6 +393,8 @@ def sqlite_count(content_prefixes: Optional[Tuple[str, ...]] = None) -> int:
 def delete_metadata_rows(content_prefixes: Optional[Tuple[str, ...]] = None) -> None:
     if not os.path.exists(METADATA_DB_FILE):
         return
+    # VACUUM cannot run inside a transaction. Delete rows first, close/commit,
+    # then reopen the database in autocommit mode for VACUUM.
     with metadata_db() as conn:
         if not content_prefixes:
             conn.execute("DELETE FROM metadata_cache")
@@ -400,7 +402,14 @@ def delete_metadata_rows(content_prefixes: Optional[Tuple[str, ...]] = None) -> 
             clauses = " OR ".join(["content_type LIKE ?" for _ in content_prefixes])
             args = tuple(prefix + "%" for prefix in content_prefixes)
             conn.execute(f"DELETE FROM metadata_cache WHERE {clauses}", args)
-        conn.execute("VACUUM")
+    try:
+        vacuum_conn = sqlite3.connect(METADATA_DB_FILE, isolation_level=None)
+        try:
+            vacuum_conn.execute("VACUUM")
+        finally:
+            vacuum_conn.close()
+    except Exception as exc:
+        log(f"Cache vacuum skipped: {exc}", xbmc.LOGWARNING)
 
 
 def clear_api_cache_only(show_notice: bool = True) -> None:
@@ -612,6 +621,202 @@ def http_get_json(url: str, timeout: int = 25, use_cache: bool = True, silent: b
     return None
 
 
+
+
+
+def cached_json_is_fresh(url: str, ttl: int = CACHE_TTL_SECONDS) -> bool:
+    try:
+        cache = load_cache()
+        cached = cache.get(url)
+        if not isinstance(cached, dict):
+            return False
+        return int(time.time()) - int(cached.get("time", 0)) < ttl
+    except Exception:
+        return False
+
+
+def save_json_to_cache(url: str, data: Any) -> None:
+    try:
+        cache = load_cache()
+        cache[url] = {"time": int(time.time()), "data": data}
+        save_cache(cache)
+    except Exception as exc:
+        log(f"Could not save forced API refresh: {exc}", xbmc.LOGWARNING)
+
+
+def http_get_json_with_progress(url: str, label: str, timeout: int = 25, force_refresh: bool = False, silent: bool = False) -> Optional[Any]:
+    if not force_refresh and cached_json_is_fresh(url):
+        return http_get_json(url, timeout=timeout, use_cache=True, silent=silent)
+
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress.create(ADDON_NAME, label)
+        progress.update(10, "Connecting to server...")
+        if force_refresh:
+            data = http_get_json(url, timeout=timeout, use_cache=False, silent=silent)
+            if data is not None:
+                save_json_to_cache(url, data)
+        else:
+            data = http_get_json(url, timeout=timeout, use_cache=True, silent=silent)
+        progress.update(100, "Done")
+        return data
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+
+
+def clear_live_tv_cache(show_notice: bool = True) -> None:
+    try:
+        cache = load_cache()
+        live_markers = (
+            "action=get_live_categories",
+            "action=get_live_streams",
+            "action=get_short_epg",
+            "text:" + xtream_xmltv_url(),
+        )
+        changed = False
+        for key in list(cache.keys()):
+            if any(marker in str(key) for marker in live_markers):
+                cache.pop(key, None)
+                changed = True
+        if changed:
+            save_cache(cache)
+        delete_metadata_rows(("epg",))
+        if show_notice:
+            notify("Live TV will refresh from server")
+    except Exception as exc:
+        log(f"Live TV cache clear failed: {exc}", xbmc.LOGERROR)
+        if show_notice:
+            notify("Could not refresh Live TV", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def refresh_live_tv() -> None:
+    clear_live_tv_cache(True)
+    xbmc.executebuiltin("Container.Refresh")
+
+def live_cache_keys_for_category(cat_id: str) -> Tuple[str, str]:
+    cat_url = xc_api_url("player_api.php?action=get_live_categories")
+    streams_url = xc_api_url(f"player_api.php?action=get_live_streams&category_id={quote(cat_id)}")
+    return cat_url, streams_url
+
+
+def cache_entry_time(cache: Dict[str, Any], key: str) -> int:
+    try:
+        item = cache.get(key)
+        if isinstance(item, dict):
+            return int(item.get("time", 0) or 0)
+    except Exception:
+        pass
+    return 0
+
+
+def nice_time(ts: int) -> str:
+    if not ts:
+        return "Never"
+    try:
+        return datetime.fromtimestamp(ts).strftime("%a %d %b, %I:%M %p")
+    except Exception:
+        return "Unknown"
+
+
+def live_tv_stats() -> None:
+    cache = load_cache()
+    cat_url, _unused = live_cache_keys_for_category("")
+    categories_entry = cache.get(cat_url) if isinstance(cache.get(cat_url), dict) else {}
+    categories = categories_entry.get("data") if isinstance(categories_entry, dict) else []
+    if not isinstance(categories, list):
+        categories = []
+
+    total_channels = 0
+    category_cache_count = 0
+    newest_update = cache_entry_time(cache, cat_url)
+    oldest_update = newest_update
+    for cat in categories:
+        cat_id = str(cat.get("category_id") or "") if isinstance(cat, dict) else ""
+        if not cat_id:
+            continue
+        _cat_url, streams_url = live_cache_keys_for_category(cat_id)
+        entry = cache.get(streams_url)
+        if isinstance(entry, dict):
+            items = entry.get("data")
+            if isinstance(items, list):
+                total_channels += len(items)
+                category_cache_count += 1
+            ts = int(entry.get("time", 0) or 0)
+            if ts:
+                newest_update = max(newest_update, ts) if newest_update else ts
+                oldest_update = min(oldest_update, ts) if oldest_update else ts
+
+    now = int(time.time())
+    age = now - newest_update if newest_update else 0
+    status = "Fresh" if newest_update and age <= CACHE_TTL_SECONDS else ("Old" if newest_update else "No cache yet")
+    next_check = newest_update + CACHE_TTL_SECONDS if newest_update else 0
+    lines = [
+        f"Last updated: {nice_time(newest_update)}",
+        f"Oldest category cache: {nice_time(oldest_update)}",
+        f"Next auto check: {nice_time(next_check)}" if next_check else "Next auto check: When Live TV is opened",
+        f"Total categories: {len(categories)}",
+        f"Cached categories: {category_cache_count}",
+        f"Total cached channels: {total_channels}",
+        f"Cache status: {status}",
+    ]
+    xbmcgui.Dialog().textviewer("Live TV Stats", "\n".join(lines))
+
+
+def clear_live_category_cache(cat_id: str, show_notice: bool = True) -> None:
+    try:
+        _cat_url, streams_url = live_cache_keys_for_category(cat_id)
+        cache = load_cache()
+        changed = False
+        for key in list(cache.keys()):
+            if str(key) == streams_url or f"category_id={quote(cat_id)}" in str(key):
+                cache.pop(key, None)
+                changed = True
+        if changed:
+            save_cache(cache)
+        if show_notice:
+            notify("Live TV category will refresh from server")
+    except Exception as exc:
+        log(f"Live TV category cache clear failed: {exc}", xbmc.LOGERROR)
+        if show_notice:
+            notify("Could not refresh category", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def refresh_live_category(cat_id: str, title: str = "") -> None:
+    if not cat_id:
+        notify("No Live TV category selected", icon=xbmcgui.NOTIFICATION_ERROR)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+
+    endpoint = f"player_api.php?action=get_live_streams&category_id={quote(cat_id)}"
+    url = xc_api_url(endpoint)
+    label = title or "Live TV category"
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress.create(ADDON_NAME, "Updating Category")
+        progress.update(10, f"Preparing {label}...")
+        clear_live_category_cache(cat_id, False)
+        progress.update(35, "Contacting server for latest channels...")
+        data = http_get_json(url, timeout=30, use_cache=False, silent=False)
+        if data is not None:
+            progress.update(75, "Saving latest channel list...")
+            save_json_to_cache(url, data)
+            if isinstance(data, list):
+                progress.update(95, f"Loaded {len(data)} channels")
+            else:
+                progress.update(95, "Latest category data saved")
+        else:
+            progress.update(95, "Server update failed, opening saved list...")
+        xbmc.sleep(250)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+
+    list_streams("live", cat_id, title or "Live TV", 1)
 
 def http_get_text(url: str, timeout: int = 20, use_cache: bool = True, ttl: int = CACHE_TTL_SECONDS, silent: bool = True) -> str:
     cache = load_cache() if use_cache else {}
@@ -1174,12 +1379,12 @@ def normalize_genre(value: Any) -> Any:
 
 
 
-def set_video_info_tag(li: xbmcgui.ListItem, info: Dict[str, Any], meta: Dict[str, Any]) -> None:
-    """Set Kodi 20/21 InfoTag fields too, so preview panes show plot immediately."""
+def set_video_info_tag(li: xbmcgui.ListItem, info: Dict[str, Any], meta: Dict[str, Any]) -> bool:
+    """Set Kodi 20/21/22 InfoTag fields without using deprecated ListItem.setInfo()."""
     try:
         tag = li.getVideoInfoTag()
     except Exception:
-        return
+        return False
     try:
         if info.get("title") and hasattr(tag, "setTitle"):
             tag.setTitle(str(info.get("title")))
@@ -1210,11 +1415,14 @@ def set_video_info_tag(li: xbmcgui.ListItem, info: Dict[str, Any], meta: Dict[st
                 tag.setRating(float(info.get("rating")))
             except Exception:
                 pass
-        if info.get("cast") and hasattr(tag, "setCast"):
-            # Kodi expects Actor objects here on some versions, so keep setInfo as the main cast path.
-            pass
+        if info.get("mediatype") and hasattr(tag, "setMediaType"):
+            tag.setMediaType(str(info.get("mediatype")))
+        if info.get("trailer") and hasattr(tag, "setTrailer"):
+            tag.setTrailer(str(info.get("trailer")))
+        return True
     except Exception as exc:
         log(f"InfoTagVideo set failed: {exc}", xbmc.LOGWARNING)
+        return False
 
 def set_video_info(li: xbmcgui.ListItem, title: str, plot: str = "", year: Any = None, meta: Optional[Dict[str, Any]] = None) -> None:
     meta = meta or {}
@@ -1248,14 +1456,15 @@ def set_video_info(li: xbmcgui.ListItem, title: str, plot: str = "", year: Any =
             elif dest == "genre":
                 value = normalize_genre(value)
             info[dest] = value
-    try:
-        li.setInfo("video", info)
-    except TypeError:
-        # Never let one bad metadata field stop folders from opening.
-        info.pop("cast", None)
-        info.pop("castandrole", None)
-        li.setInfo("video", info)
-    set_video_info_tag(li, info, meta)
+    tag_ok = set_video_info_tag(li, info, meta)
+    if not tag_ok:
+        try:
+            li.setInfo("video", info)
+        except TypeError:
+            # Never let one bad metadata field stop folders from opening.
+            info.pop("cast", None)
+            info.pop("castandrole", None)
+            li.setInfo("video", info)
     unique_ids = {}
     for key in ("imdb_id", "imdb", "tmdb_id", "tmdb"):
         value = meta.get(key)
@@ -1271,12 +1480,14 @@ def set_video_info(li: xbmcgui.ListItem, title: str, plot: str = "", year: Any =
         # This lets Kodi skins show a Trailer button in the movie/show info window.
         li.setProperty("Trailer", trailer_url)
         try:
-            li.setInfo("video", {"trailer": trailer_url})
+            tag = li.getVideoInfoTag()
+            if hasattr(tag, "setTrailer"):
+                tag.setTrailer(trailer_url)
         except Exception:
             pass
 
 
-def add_folder(label: str, mode: str, extra: Optional[Dict[str, Any]] = None, thumb: str = "", plot: str = "") -> None:
+def add_folder(label: str, mode: str, extra: Optional[Dict[str, Any]] = None, thumb: str = "", plot: str = "", context_items: Optional[List[Tuple[str, str]]] = None) -> None:
     params = {"mode": mode}
     if extra:
         params.update(extra)
@@ -1285,7 +1496,7 @@ def add_folder(label: str, mode: str, extra: Optional[Dict[str, Any]] = None, th
     if plot:
         set_video_info(li, label, plot, None, {"plot": plot})
     # Replace external/global context menus so Debrid add-ons do not inject entries here.
-    li.addContextMenuItems([], replaceItems=True)
+    li.addContextMenuItems(context_items or [], replaceItems=True)
     xbmcplugin.addDirectoryItem(HANDLE, build_url(params), li, True)
 
 
@@ -1395,20 +1606,74 @@ def fav_remove(url: str) -> None:
     notify("Removed from favourites")
 
 
+def fav_category_key(content_type: str, cat_id: str) -> str:
+    return f"category:{content_type}:{cat_id}"
+
+
+def fav_category_is_saved(content_type: str, cat_id: str) -> bool:
+    key = fav_category_key(content_type, cat_id)
+    return any((item.get("url") or "") == key for item in fav_load())
+
+
+def fav_category_add(name: str, content_type: str, cat_id: str, thumb: str = "") -> None:
+    clean_id = str(cat_id or "").strip()
+    if not clean_id:
+        notify("Cannot favourite this category", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    key = fav_category_key(content_type or "live", clean_id)
+    items = fav_load()
+    if any((item.get("url") or "") == key for item in items):
+        notify("Category already in favourites")
+        return
+    items.append({
+        "name": name or "Live TV Category",
+        "url": key,
+        "thumb": thumb or "",
+        "type": "category",
+        "content_type": content_type or "live",
+        "cat_id": clean_id,
+    })
+    fav_save(items)
+    notify("Category added to favourites")
+
+
+def fav_category_remove(content_type: str, cat_id: str) -> None:
+    key = fav_category_key(content_type or "live", str(cat_id or "").strip())
+    fav_save([item for item in fav_load() if (item.get("url") or "") != key])
+    notify("Category removed from favourites")
+
+
 def clear_favourites() -> None:
     if xbmcgui.Dialog().yesno(ADDON_NAME, "Remove all saved favourites?"):
         fav_save([])
         notify("Favourites cleared")
 
 
+def safe_image_url(value: Any) -> str:
+    if isinstance(value, list) and value:
+        value = value[0]
+    if isinstance(value, dict):
+        value = value.get("url") or value.get("path") or ""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    low = text.lower()
+    if low.startswith(("script://", "plugin://")):
+        return ""
+    # Wikimedia thumb URLs generated from SVGs can return HTTP 400 in Kodi.
+    # Skip them so Kodi uses the add-on icon instead of spamming CCurlFile errors.
+    if "upload.wikimedia.org/wikipedia" in low and ".svg/" in low:
+        return ""
+    if "sky_sports_logo_2020.svg" in low:
+        return ""
+    return tmdb_image(text)
+
+
 def best_image(*values: Any) -> str:
     for value in values:
-        if isinstance(value, list) and value:
-            value = value[0]
-        if isinstance(value, dict):
-            value = value.get("url") or value.get("path") or ""
-        if value not in (None, ""):
-            return tmdb_image(value)
+        image = safe_image_url(value)
+        if image:
+            return image
     return ""
 
 
@@ -1662,12 +1927,18 @@ def list_nz_streams() -> None:
 def list_categories(action: str, next_mode: str, title: str) -> None:
     xbmcplugin.setPluginCategory(HANDLE, title)
     xbmcplugin.setContent(HANDLE, "videos")
-    data = http_get_json(xc_api_url(f"player_api.php?action={action}"))
+    url = xc_api_url(f"player_api.php?action={action}")
+    if action == "get_live_categories":
+        data = http_get_json_with_progress(url, "Loading Live TV categories...", timeout=25)
+    else:
+        data = http_get_json(url)
     if not isinstance(data, list) or not data:
         add_action("No categories found", "main")
         xbmcplugin.endOfDirectory(HANDLE)
         return
     if action == "get_live_categories":
+        add_action("Live TV Stats", "live_stats", plot="Show when Live TV was last updated, cache status, category count and cached channel count.")
+        add_action("Refresh Live TV", "live_refresh", plot="Force Bang TV to get the latest Live TV categories, channels and EPG from the server.")
         add_folder("New Zealand Streams", "nz_streams", plot="Official free-to-air New Zealand streams.\nGeo-blocked to New Zealand.")
     if action == "get_vod_categories":
         add_folder("Recently Added Movies", "recent_vod")
@@ -1675,7 +1946,14 @@ def list_categories(action: str, next_mode: str, title: str) -> None:
         name = cat.get("category_name") or "Unknown"
         cat_id = str(cat.get("category_id") or "")
         if cat_id:
-            add_folder(name, next_mode, {"cat_id": cat_id})
+            context_items = []
+            if action == "get_live_categories":
+                context_items.append(("Update Category", f'Container.Update({build_url({"mode": "live_refresh_category", "cat_id": cat_id, "title": name})})'))
+                if fav_category_is_saved("live", cat_id):
+                    context_items.append(("Remove category from Bang TV favourites", f'RunPlugin({build_url({"mode": "fav_category_remove", "content_type": "live", "cat_id": cat_id})})'))
+                else:
+                    context_items.append(("Add category to Bang TV favourites", f'RunPlugin({build_url({"mode": "fav_category_add", "name": name, "content_type": "live", "cat_id": cat_id})})'))
+            add_folder(name, next_mode, {"cat_id": cat_id}, context_items=context_items)
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -1694,7 +1972,11 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
     else:
         endpoint = f"player_api.php?action=get_series&category_id={quote(cat_id)}"
 
-    data = http_get_json(xc_api_url(endpoint))
+    url = xc_api_url(endpoint)
+    if content_type == "live":
+        data = http_get_json_with_progress(url, "Loading Live TV channels...", timeout=25)
+    else:
+        data = http_get_json(url)
     if not isinstance(data, list) or not data:
         add_action("Nothing found", "main")
         xbmcplugin.endOfDirectory(HANDLE)
@@ -1886,6 +2168,16 @@ def favourites_menu() -> None:
         add_action("No favourites yet", "main")
     else:
         for item in items:
+            if item.get("type") == "category":
+                content_type = item.get("content_type") or "live"
+                cat_id = item.get("cat_id") or ""
+                if content_type == "live" and cat_id:
+                    context_items = [
+                        ("Update Category", f'Container.Update({build_url({"mode": "live_refresh_category", "cat_id": cat_id, "title": item.get("name") or "Live TV"})})'),
+                        ("Remove category from Bang TV favourites", f'RunPlugin({build_url({"mode": "fav_category_remove", "content_type": "live", "cat_id": cat_id})})'),
+                    ]
+                    add_folder(item.get("name") or "Live TV Category", "live_streams", {"cat_id": cat_id}, item.get("thumb") or "", "Favourite Live TV category", context_items=context_items)
+                continue
             add_playable(item.get("name") or "Unknown", item.get("url") or "", item.get("thumb") or "")
         add_action("Clear all favourites", "clear_favourites")
     xbmcplugin.endOfDirectory(HANDLE)
@@ -2124,6 +2416,12 @@ def router(paramstring: str) -> None:
     elif mode == "fav_remove":
         fav_remove(params.get("url") or "")
         xbmc.executebuiltin("Container.Refresh")
+    elif mode == "fav_category_add":
+        fav_category_add(params.get("name") or "Live TV Category", params.get("content_type") or "live", params.get("cat_id") or "", params.get("thumb") or "")
+        xbmc.executebuiltin("Container.Refresh")
+    elif mode == "fav_category_remove":
+        fav_category_remove(params.get("content_type") or "live", params.get("cat_id") or "")
+        xbmc.executebuiltin("Container.Refresh")
     elif mode == "search":
         search_type_menu()
     elif mode == "search_all":
@@ -2136,6 +2434,12 @@ def router(paramstring: str) -> None:
         search_menu("series")
     elif mode == "live_categories":
         list_categories("get_live_categories", "live_streams", "Live TV")
+    elif mode == "live_refresh":
+        refresh_live_tv()
+    elif mode == "live_stats":
+        live_tv_stats()
+    elif mode == "live_refresh_category":
+        refresh_live_category(params.get("cat_id") or "", params.get("title") or "Live TV")
     elif mode == "nz_streams":
         list_nz_streams()
     elif mode == "vod_categories":
@@ -2158,6 +2462,19 @@ def router(paramstring: str) -> None:
         main_menu()
 
 
+def safe_router(paramstring: str) -> None:
+    try:
+        router(paramstring)
+    except Exception as exc:
+        log(f"Directory failed: {exc}", xbmc.LOGERROR)
+        try:
+            xbmcplugin.setContent(HANDLE, "videos")
+            add_action("Could not load this folder", "main", plot="Bang TV hit a provider or metadata error. Go back and try again, or clear cache from Tools.")
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+        except Exception:
+            pass
+
+
 if __name__ == "__main__":
     first_run_check()
-    router(sys.argv[2][1:] if len(sys.argv) > 2 else "")
+    safe_router(sys.argv[2][1:] if len(sys.argv) > 2 else "")
