@@ -1,3 +1,23 @@
+1.0.44
+- Added Android TV fast browsing mode. New metadata preview fetches are capped per page and the rest are queued for the background service, reducing folder-opening delays.
+- Removed the metadata loading pop-up in fast mode so Android TV folders open with less interruption.
+- Added in-memory API cache reuse during each Kodi menu build to reduce repeated storage reads on Android TV.
+- Added API cache pruning so old responses do not make the cache file grow too large over time.
+- Improved SQLite metadata database settings with WAL and normal sync for smoother reads and fewer lock delays.
+- Reduced background service queue writes from every item to once per batch for less storage churn.
+- Increased background service HTTP pooling and batch size so metadata catches up faster after browsing.
+- Added fanart asset fallback for Kodi skins that look for add-on fanart as well as icon.png.
+
+
+v1.0.43
+- Improved Android TV artwork handling so folder/action items fall back to the bundled add-on icon across more Kodi skins.
+- Added extra art keys and legacy ListItem properties for skins that do not read icon/thumb consistently.
+- Upgrade detection now clears generated API, metadata, EPG, artwork and live update cache while keeping login, settings, favourites and manual EPG mappings.
+- Startup preload is triggered after upgrades so menus and Live TV data rebuild fresh.
+- Added atomic cache writes to reduce corrupted cache files after Kodi/Android TV shutdowns.
+- Added HTTP connection pooling for smoother browsing and fewer small delays.
+- Removed packaged __pycache__ files from the ZIP.
+
 v1.0.42
 - Fixed manual EPG assignment activity logging crash.
 - EPG Manager and context-menu assignment should now save, show success, and refresh folder.
@@ -214,6 +234,7 @@ v1.0.5
 - Replaced deprecated Kodi ListItem.setInfo() calls with InfoTagVideo setter path where available.
 - Skipped broken Wikimedia SVG thumbnail artwork that caused HTTP 400 spam.
 - Added safer folder error handling so live categories fail gracefully instead of breaking the directory.
+
 [B]v1.0.0[/B]
 
 Initial release of Bang TV.

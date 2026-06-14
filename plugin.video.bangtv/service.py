@@ -32,7 +32,7 @@ METADATA_TTL_SECONDS = 30 * 24 * 60 * 60
 REQUEST_TIMEOUT = 6
 IDLE_SLEEP = 2
 RATE_SLEEP = 0.35
-MAX_PER_CYCLE = 30
+MAX_PER_CYCLE = 45
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 CACHE_FILE = os.path.join(PROFILE_PATH, "api_cache.json")
 CACHE_TTL_SECONDS = 10 * 60
@@ -44,8 +44,14 @@ LIVE_ACTIVE_CATEGORY_CHECK_SECONDS = 10 * 60
 LIVE_RECENT_CATEGORY_CHECK_SECONDS = 30 * 60
 
 SESSION = requests.Session()
+try:
+    _adapter = requests.adapters.HTTPAdapter(pool_connections=8, pool_maxsize=16, max_retries=0)
+    SESSION.mount("http://", _adapter)
+    SESSION.mount("https://", _adapter)
+except Exception:
+    pass
 SESSION.headers.update({
-    "User-Agent": "Kodi BangTV/1.0.10 background-service",
+    "User-Agent": "Kodi BangTV/1.0.44 background-service",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 })
@@ -87,7 +93,12 @@ def redact_url(url: str) -> str:
 
 
 def metadata_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(METADATA_DB_FILE)
+    conn = sqlite3.connect(METADATA_DB_FILE, timeout=10)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+    except Exception:
+        pass
     conn.execute(
         "CREATE TABLE IF NOT EXISTS metadata_cache ("
         "cache_key TEXT PRIMARY KEY, "
@@ -150,8 +161,10 @@ def read_queue() -> List[Dict[str, Any]]:
 
 def write_queue(items: List[Dict[str, Any]]) -> None:
     try:
-        with open(BACKGROUND_QUEUE_FILE, "w", encoding="utf-8") as fh:
-            json.dump(items[:5000], fh, ensure_ascii=False)
+        tmp_file = BACKGROUND_QUEUE_FILE + ".tmp"
+        with open(tmp_file, "w", encoding="utf-8") as fh:
+            json.dump(items[:2500], fh, ensure_ascii=False)
+        os.replace(tmp_file, BACKGROUND_QUEUE_FILE)
     except Exception as exc:
         log(f"queue save failed: {exc}", xbmc.LOGWARNING)
 
@@ -183,8 +196,13 @@ def load_api_cache() -> Dict[str, Any]:
 
 def save_api_cache(cache: Dict[str, Any]) -> None:
     try:
-        with open(CACHE_FILE, "w", encoding="utf-8") as fh:
+        if isinstance(cache, dict) and len(cache) > 350:
+            items = sorted(cache.items(), key=lambda kv: int(kv[1].get("time", 0)) if isinstance(kv[1], dict) else 0, reverse=True)
+            cache = dict(items[:350])
+        tmp_file = CACHE_FILE + ".tmp"
+        with open(tmp_file, "w", encoding="utf-8") as fh:
             json.dump(cache, fh, ensure_ascii=False)
+        os.replace(tmp_file, CACHE_FILE)
     except Exception as exc:
         log(f"api cache save failed: {exc}", xbmc.LOGWARNING)
 
@@ -566,7 +584,6 @@ def run() -> None:
             continue
         # Current page metadata is more important than startup EPG/channel preload.
         queue = sorted(queue, key=lambda i: 0 if isinstance(i, dict) and i.get("priority") else 1)
-        write_queue(queue)
         remaining = queue[:]
         processed = 0
         changed = False
@@ -578,9 +595,9 @@ def run() -> None:
                 # Put failed items at the end, but do not hammer the server.
                 remaining.append(item)
             processed += 1
-            write_queue(remaining)
             monitor.waitForAbort(RATE_SLEEP)
         if changed:
+            write_queue(remaining)
             # Safe and light refresh: lets descriptions appear after the cache is filled.
             try:
                 xbmc.executebuiltin("Container.Refresh")

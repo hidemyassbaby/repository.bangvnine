@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.35
+Version 1.0.44
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -45,13 +45,19 @@ SKYGO_EPG_CATEGORY_IDS = {"317"}  # VIP | Sky Sport NZ
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.35",
+    "User-Agent": "Kodi BangTV/1.0.44",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
 
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
+try:
+    _adapter = requests.adapters.HTTPAdapter(pool_connections=8, pool_maxsize=16, max_retries=0)
+    SESSION.mount("http://", _adapter)
+    SESSION.mount("https://", _adapter)
+except Exception:
+    pass
 
 PROFILE_PATH = xbmcvfs.translatePath(ADDON.getAddonInfo("profile")).rstrip("/\\")
 if not xbmcvfs.exists(PROFILE_PATH):
@@ -61,11 +67,37 @@ FAV_FILE = os.path.join(PROFILE_PATH, "favorites.json")
 CACHE_FILE = os.path.join(PROFILE_PATH, "api_cache.json")
 METADATA_DB_FILE = os.path.join(PROFILE_PATH, "metadata.db")
 CACHE_TTL_SECONDS = 10 * 60
+FAST_PREVIEW_FETCH_LIMIT = 8
+_API_CACHE_MEMORY = None
+_API_CACHE_DIRTY = False
 METADATA_TTL_SECONDS = 30 * 24 * 60 * 60
 EPG_TTL_SECONDS = 6 * 60 * 60
 PAGE_SIZE = 20
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
-ADDON_ICON = xbmcvfs.translatePath(ADDON.getAddonInfo("icon")) or "icon.png"
+def addon_icon_path() -> str:
+    candidates = []
+    try:
+        candidates.append(xbmcvfs.translatePath(ADDON.getAddonInfo("icon")))
+    except Exception:
+        pass
+    candidates.extend([
+        f"special://home/addons/{ADDON_ID}/icon.png",
+        f"special://xbmc/addons/{ADDON_ID}/icon.png",
+        os.path.join(xbmcvfs.translatePath(ADDON.getAddonInfo("path")), "icon.png"),
+        "icon.png",
+    ])
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            if str(candidate).startswith("special://") or xbmcvfs.exists(candidate) or os.path.exists(candidate):
+                return candidate
+        except Exception:
+            continue
+    return f"special://home/addons/{ADDON_ID}/icon.png"
+
+
+ADDON_ICON = addon_icon_path()
 ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.13"
 VERSION_MARKER_FILE = os.path.join(PROFILE_PATH, "installed_version.txt")
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
@@ -221,15 +253,23 @@ def xc_api_url(endpoint: str) -> str:
 
 
 def load_cache() -> Dict[str, Any]:
+    """Load the API cache once per Kodi plugin run.
+
+    Android TV can feel laggy if the JSON cache file is read many times while
+    building a menu. Keeping it in memory for the current run reduces disk I/O.
+    """
+    global _API_CACHE_MEMORY
+    if isinstance(_API_CACHE_MEMORY, dict):
+        return _API_CACHE_MEMORY
     try:
         if not os.path.exists(CACHE_FILE):
-            return {}
+            _API_CACHE_MEMORY = {}
+            return _API_CACHE_MEMORY
         with open(CACHE_FILE, "r", encoding="utf-8") as fh:
             text = fh.read()
         try:
             data = json.loads(text)
         except Exception as exc:
-            # Recover from older corrupted cache files that accidentally have extra JSON appended.
             log(f"Cache read failed, attempting recovery: {exc}", xbmc.LOGWARNING)
             decoder = json.JSONDecoder()
             data, _idx = decoder.raw_decode(text.strip())
@@ -237,7 +277,8 @@ def load_cache() -> Dict[str, Any]:
                 save_cache(data if isinstance(data, dict) else {})
             except Exception:
                 pass
-        return data if isinstance(data, dict) else {}
+        _API_CACHE_MEMORY = data if isinstance(data, dict) else {}
+        return _API_CACHE_MEMORY
     except Exception as exc:
         log(f"Cache read failed: {exc}", xbmc.LOGWARNING)
         try:
@@ -246,19 +287,41 @@ def load_cache() -> Dict[str, Any]:
                 os.replace(CACHE_FILE, bad_file)
         except Exception:
             pass
-        return {}
+        _API_CACHE_MEMORY = {}
+        return _API_CACHE_MEMORY
+
+
+def prune_cache(cache: Dict[str, Any], max_entries: int = 350) -> Dict[str, Any]:
+    """Keep the on-disk cache small so Android TV storage stays quick."""
+    try:
+        if len(cache) <= max_entries:
+            return cache
+        items = sorted(cache.items(), key=lambda kv: int(kv[1].get("time", 0)) if isinstance(kv[1], dict) else 0, reverse=True)
+        return dict(items[:max_entries])
+    except Exception:
+        return cache
 
 
 def save_cache(cache: Dict[str, Any]) -> None:
+    global _API_CACHE_MEMORY
     try:
-        with open(CACHE_FILE, "w", encoding="utf-8") as fh:
+        cache = prune_cache(cache if isinstance(cache, dict) else {})
+        _API_CACHE_MEMORY = cache
+        tmp_file = CACHE_FILE + ".tmp"
+        with open(tmp_file, "w", encoding="utf-8") as fh:
             json.dump(cache, fh, ensure_ascii=False)
+        os.replace(tmp_file, CACHE_FILE)
     except Exception as exc:
         log(f"Cache save failed: {exc}", xbmc.LOGWARNING)
 
 
 def metadata_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(METADATA_DB_FILE)
+    conn = sqlite3.connect(METADATA_DB_FILE, timeout=10)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+    except Exception:
+        pass
     conn.execute(
         "CREATE TABLE IF NOT EXISTS metadata_cache ("
         "cache_key TEXT PRIMARY KEY, "
@@ -326,8 +389,10 @@ def read_background_queue() -> List[Dict[str, Any]]:
 
 def save_background_queue(items: List[Dict[str, Any]]) -> None:
     try:
-        with open(BACKGROUND_QUEUE_FILE, "w", encoding="utf-8") as fh:
-            json.dump(items[:5000], fh, ensure_ascii=False)
+        tmp_file = BACKGROUND_QUEUE_FILE + ".tmp"
+        with open(tmp_file, "w", encoding="utf-8") as fh:
+            json.dump(items[:2500], fh, ensure_ascii=False)
+        os.replace(tmp_file, BACKGROUND_QUEUE_FILE)
     except Exception as exc:
         log(f"Metadata queue save failed: {exc}", xbmc.LOGWARNING)
 
@@ -382,8 +447,12 @@ def metadata_cache_delete_file() -> None:
 
 def clear_cache() -> None:
     try:
-        if os.path.exists(CACHE_FILE):
-            os.remove(CACHE_FILE)
+        for path in (CACHE_FILE, BACKGROUND_QUEUE_FILE, LIVE_UPDATE_STATE_FILE):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
         metadata_cache_delete_file()
         notify("Cache cleared")
     except Exception as exc:
@@ -407,11 +476,20 @@ def handle_version_update() -> None:
             with open(VERSION_MARKER_FILE, "r", encoding="utf-8") as fh:
                 old = (fh.read() or "").strip()
         if old != ADDON_VERSION:
+            # New installs and upgrades can otherwise keep stale category, EPG and artwork rows.
+            # Clear all generated cache, but keep login, settings, favourites and manual mappings.
+            for path in (CACHE_FILE, BACKGROUND_QUEUE_FILE, LIVE_UPDATE_STATE_FILE):
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                except Exception:
+                    pass
+            metadata_cache_delete_file()
+            metadata_db().close()
             with open(VERSION_MARKER_FILE, "w", encoding="utf-8") as fh:
                 fh.write(ADDON_VERSION)
-            clear_api_cache_only(False)
             mark_startup_preload_pending("version_update")
-            notify(f"Bang TV updated to v{ADDON_VERSION}. Menus will refresh on next load.")
+            notify(f"Bang TV updated to v{ADDON_VERSION}. Fresh cache will rebuild now.")
     except Exception as exc:
         log(f"Version update check failed: {exc}", xbmc.LOGWARNING)
 
@@ -1722,12 +1800,27 @@ def safe_int(value: Any, default: int = 0) -> int:
 def set_art(li: xbmcgui.ListItem, thumb: str = "", fanart: str = "") -> None:
     thumb = safe_image_url(thumb) if thumb else ""
     fanart = safe_image_url(fanart) if fanart else ""
-    art = {"icon": thumb or ADDON_ICON, "thumb": thumb or ADDON_ICON}
-    if thumb:
-        art.update({"poster": thumb})
+    fallback = ADDON_ICON
+    image = thumb or fallback
+    art = {
+        "icon": image,
+        "thumb": image,
+        "poster": image,
+        "banner": image,
+        "landscape": fanart or image,
+    }
     if fanart:
         art["fanart"] = fanart
+    else:
+        art["fanart"] = fallback
     li.setArt(art)
+    # Some Android TV skins look at old ListItem properties instead of setArt only.
+    try:
+        li.setProperty("icon", image)
+        li.setProperty("thumb", image)
+        li.setProperty("fanart_image", art.get("fanart") or fallback)
+    except Exception:
+        pass
 
 
 def normalize_cast(value: Any) -> List[tuple]:
@@ -1929,8 +2022,10 @@ def read_json_file(path: str, fallback: Any) -> Any:
 
 def write_json_file(path: str, data: Any) -> None:
     try:
-        with open(path, "w", encoding="utf-8") as fh:
+        tmp_file = path + ".tmp"
+        with open(tmp_file, "w", encoding="utf-8") as fh:
             json.dump(data, fh, ensure_ascii=False, indent=2)
+        os.replace(tmp_file, path)
     except Exception as exc:
         log(f"Could not write {path}: {exc}", xbmc.LOGERROR)
 
@@ -3173,6 +3268,7 @@ def batch_preview_metadata(content_type: str, ids: List[Any], limit: int = PAGE_
     if not ids or not preview_metadata_on_browse() or full_metadata_on_browse():
         return {}
     ids = [i for i in ids if i not in (None, "")][:limit]
+    fetch_limit = FAST_PREVIEW_FETCH_LIMIT if setting_bool("android_tv_fast_mode", True) else limit
     results: Dict[str, Dict[str, Any]] = {}
     missing: List[Any] = []
     for item_id in ids:
@@ -3184,18 +3280,24 @@ def batch_preview_metadata(content_type: str, ids: List[Any], limit: int = PAGE_
 
     if not missing:
         return results
+    if len(missing) > fetch_limit:
+        enqueue_background_metadata(content_type, missing[fetch_limit:], priority=False)
+        missing = missing[:fetch_limit]
 
+    fast_mode = setting_bool("android_tv_fast_mode", True)
     label = "movies" if content_type == "vod" else "TV shows" if content_type == "series" else "episodes"
-    progress = xbmcgui.DialogProgress()
+    progress = None if fast_mode else xbmcgui.DialogProgress()
     try:
-        progress.create(ADDON_NAME, f"Loading {label} metadata...")
+        if progress:
+            progress.create(ADDON_NAME, f"Loading {label} metadata...")
         total = len(missing)
         for index, item_id in enumerate(missing, start=1):
-            if progress.iscanceled():
+            if progress and progress.iscanceled():
                 enqueue_background_metadata(content_type, missing[index-1:], priority=True)
                 break
-            percent = int((index - 1) * 100 / max(total, 1))
-            progress.update(percent, f"Loading {label} metadata, item {index} of {total}")
+            if progress:
+                percent = int((index - 1) * 100 / max(total, 1))
+                progress.update(percent, f"Loading {label} metadata, item {index} of {total}")
             try:
                 if content_type == "vod":
                     meta = vod_info_xtream_only(item_id)
@@ -3210,10 +3312,12 @@ def batch_preview_metadata(content_type: str, ids: List[Any], limit: int = PAGE_
             except Exception as exc:
                 log(f"Preview metadata failed for {content_type} {item_id}: {exc}", xbmc.LOGWARNING)
                 enqueue_background_metadata(content_type, [item_id], priority=True)
-        progress.update(100, f"Loading {label} metadata, done")
+        if progress:
+            progress.update(100, f"Loading {label} metadata, done")
     finally:
         try:
-            progress.close()
+            if progress:
+                progress.close()
         except Exception:
             pass
     return results
@@ -5292,7 +5396,7 @@ def _btv_download_xmltv_source(url: str, progress: Any = None) -> Tuple[bytes, s
                 except Exception:
                     pass
             headers = {
-                "User-Agent": "Kodi BangTV/1.0.35",
+                "User-Agent": "Kodi BangTV/1.0.44",
                 "Accept": "application/xml,text/xml,*/*",
             }
             response = SESSION.get(candidate, timeout=90, headers=headers)

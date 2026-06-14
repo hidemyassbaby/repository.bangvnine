@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.bangtv" name="Bang TV" version="1.0.42" provider-name="Bang">
+<addon id="plugin.video.bangtv" name="Bang TV" version="1.0.44" provider-name="Bang">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests"/>
@@ -20,6 +20,7 @@
         <disclaimer>This add-on does not host any content. Use only with content and services you are allowed to access.</disclaimer>
         <assets>
             <icon>icon.png</icon>
+            <fanart>fanart.png</fanart>
         </assets>
     </extension>
 </addon>

@@ -3,6 +3,7 @@
     <setting id="username" type="text" label="Username" default="" />
     <setting id="password" type="text" label="Password" option="hidden" default="" />
     <setting id="show_account_status" type="bool" label="Show account status on main menu" default="true" />
+    <setting id="android_tv_fast_mode" type="bool" label="Android TV fast browsing mode" default="true" />
     <setting id="enhanced_metadata" type="bool" label="Show movie and TV metadata / trailers" default="true" />
     <setting id="tmdb_proxy_enabled" type="bool" label="Use Bang TV Cloudflare TMDB metadata proxy" default="true" />
     <setting id="preview_metadata_on_browse" type="bool" label="Show cached preview details while browsing folders" default="true" />
