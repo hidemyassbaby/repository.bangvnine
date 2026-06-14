@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.10
+Version 1.0.13
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -42,7 +42,7 @@ DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.10",
+    "User-Agent": "Kodi BangTV/1.0.13",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -63,7 +63,7 @@ EPG_TTL_SECONDS = 6 * 60 * 60
 PAGE_SIZE = 20
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
 ADDON_ICON = xbmcvfs.translatePath(ADDON.getAddonInfo("icon")) or "icon.png"
-ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.10"
+ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.13"
 VERSION_MARKER_FILE = os.path.join(PROFILE_PATH, "installed_version.txt")
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 PLAY_LINKS_FILE = os.path.join(PROFILE_PATH, "play_links.json")
@@ -72,6 +72,8 @@ RECENT_LIVE_FILE = os.path.join(PROFILE_PATH, "recent_live.json")
 HIDDEN_LIVE_CATEGORIES_FILE = os.path.join(PROFILE_PATH, "hidden_live_categories.json")
 STREAM_HEALTH_FILE = os.path.join(PROFILE_PATH, "stream_health.json")
 BACKUP_FILE = os.path.join(PROFILE_PATH, "bangtv_user_backup.json")
+PVR_EXPORT_M3U_FILE = os.path.join(PROFILE_PATH, "bangtv_pvr_channels.m3u8")
+PVR_EXPORT_INFO_FILE = os.path.join(PROFILE_PATH, "bangtv_pvr_guide_setup.txt")
 LIVE_AUTO_CHECK_SECONDS = 30 * 60
 LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
 LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD = 20
@@ -2355,6 +2357,849 @@ def sorted_items(items: Iterable[Dict[str, Any]], name_key: str = "name") -> Lis
 
 
 
+
+def xmltv_guide_data(epg_url: str, cache_key: str = "xtream_7day_guide") -> Dict[str, Any]:
+    """Parse XMLTV into a 7 day guide map for TV Guide folders."""
+    if not epg_url or not setting_bool("show_epg", True):
+        return {"channels": {}, "programmes": {}}
+    cached = metadata_cache_get("epg_guide", cache_key, ttl=EPG_TTL_SECONDS)
+    if cached and isinstance(cached, dict):
+        return cached
+    raw = http_get_bytes(epg_url, timeout=35, use_cache=True, ttl=EPG_TTL_SECONDS, silent=True)
+    if not raw:
+        return {"channels": {}, "programmes": {}}
+    try:
+        if epg_url.endswith(".gz") or raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+    except Exception:
+        pass
+    try:
+        root = ET.fromstring(raw)
+    except Exception as exc:
+        log(f"TV Guide XMLTV parse failed: {exc}", xbmc.LOGWARNING)
+        return {"channels": {}, "programmes": {}}
+
+    channels: Dict[str, List[str]] = {}
+    for channel in root.findall("channel"):
+        ch_id = channel.get("id") or ""
+        if not ch_id:
+            continue
+        names = []
+        for dn in channel.findall("display-name"):
+            if dn.text and dn.text.strip():
+                names.append(dn.text.strip())
+        channels[ch_id] = names
+
+    now_ts = int(time.time())
+    end_ts = now_ts + 7 * 24 * 60 * 60
+    programmes: Dict[str, List[Dict[str, Any]]] = {}
+    for prog in root.findall("programme"):
+        ch = prog.get("channel") or ""
+        start = parse_xmltv_time(prog.get("start"))
+        stop = parse_xmltv_time(prog.get("stop"))
+        if not ch or start is None or stop is None:
+            continue
+        if stop < now_ts - 300 or start > end_ts:
+            continue
+        row = {
+            "start": int(start),
+            "stop": int(stop),
+            "title": xml_text(prog, "title") or "Programme",
+            "desc": xml_text(prog, "desc"),
+            "category": xml_text(prog, "category"),
+        }
+        programmes.setdefault(ch, []).append(row)
+    for rows in programmes.values():
+        rows.sort(key=lambda r: int(r.get("start") or 0))
+    result = {"channels": channels, "programmes": programmes, "updated": now_ts}
+    if programmes:
+        metadata_cache_set("epg_guide", cache_key, result)
+    return result
+
+
+def guide_match_ids(item: Dict[str, Any], guide: Dict[str, Any]) -> List[str]:
+    channels = guide.get("channels") if isinstance(guide, dict) else {}
+    if not isinstance(channels, dict):
+        channels = {}
+    name = item.get("name") or ""
+    clean_name = re.sub(r"\b(FHD|HD|SD|UHD|4K|HEVC|H265|H264|1080P|720P)\b", "", str(name or ""), flags=re.I)
+    clean_name = " ".join(clean_name.replace("|", " ").split())
+    direct_candidates = [
+        item.get("epg_channel_id"), item.get("tvg_id"), item.get("channel_id"), item.get("stream_id"), name, clean_name,
+    ]
+    matches: List[str] = []
+    for cand in direct_candidates:
+        if cand in (None, ""):
+            continue
+        text = str(cand)
+        if text in channels and text not in matches:
+            matches.append(text)
+        ntext = norm_epg_key(text)
+        for ch_id, names in channels.items():
+            if norm_epg_key(ch_id) == ntext and ch_id not in matches:
+                matches.append(ch_id)
+            for dn in names or []:
+                if norm_epg_key(dn) == ntext and ch_id not in matches:
+                    matches.append(ch_id)
+    return matches
+
+
+def guide_programmes_for_item(item: Dict[str, Any], guide: Dict[str, Any]) -> List[Dict[str, Any]]:
+    programmes = guide.get("programmes") if isinstance(guide, dict) else {}
+    if not isinstance(programmes, dict):
+        return []
+    rows: List[Dict[str, Any]] = []
+    for ch_id in guide_match_ids(item, guide):
+        for row in programmes.get(ch_id, []) or []:
+            if isinstance(row, dict):
+                rows.append(row)
+    rows.sort(key=lambda r: int(r.get("start") or 0))
+    return rows
+
+
+def guide_now_next_text(rows: List[Dict[str, Any]]) -> str:
+    now_ts = int(time.time())
+    current = None
+    nxt = None
+    for row in rows:
+        start = int(row.get("start") or 0)
+        stop = int(row.get("stop") or 0)
+        if start <= now_ts <= stop:
+            current = row
+        elif start > now_ts and nxt is None:
+            nxt = row
+        if current and nxt:
+            break
+    lines: List[str] = []
+    if current:
+        lines.append(f"Now: {current.get('title') or 'Programme'} ({format_local_time(current.get('start'))} - {format_local_time(current.get('stop'))})")
+        if current.get("desc"):
+            lines.append(str(current.get("desc")))
+    if nxt:
+        if lines:
+            lines.append("")
+        lines.append(f"Next: {nxt.get('title') or 'Programme'} ({format_local_time(nxt.get('start'))})")
+    return "\n".join(lines)
+
+
+
+def m3u_escape(value: Any) -> str:
+    return str(value or "").replace('"', "'").replace("\n", " ").strip()
+
+
+def export_native_pvr_files(show_dialog: bool = True) -> bool:
+    """Export a local M3U playlist and XMLTV setup note for Kodi IPTV Simple PVR."""
+    if not has_saved_login():
+        notify("Login needed first", icon=xbmcgui.NOTIFICATION_ERROR)
+        return False
+    progress = xbmcgui.DialogProgress()
+    if show_dialog:
+        progress.create("Bang TV Native Guide", "Preparing PVR-style TV guide files...")
+    try:
+        if show_dialog:
+            progress.update(10, "Loading Live TV categories...")
+        cats = http_get_json(xc_api_url("player_api.php?action=get_live_categories"), timeout=25, use_cache=False)
+        cat_names: Dict[str, str] = {}
+        if isinstance(cats, list):
+            for cat in cats:
+                cat_id = str(cat.get("category_id") or "")
+                cat_names[cat_id] = str(cat.get("category_name") or "Live TV")
+        if show_dialog:
+            progress.update(35, "Loading latest Live TV channels...")
+        streams = http_get_json(xc_api_url("player_api.php?action=get_live_streams"), timeout=45, use_cache=False)
+        if not isinstance(streams, list) or not streams:
+            if show_dialog:
+                progress.close()
+            notify("No Live TV channels found", icon=xbmcgui.NOTIFICATION_ERROR)
+            return False
+        user, pwd, _label = get_effective_creds()
+        total = max(1, len(streams))
+        lines = ["#EXTM3U x-tvg-url=\"{}\"".format(m3u_escape(xtream_xmltv_url()))]
+        for idx, item in enumerate(streams):
+            if show_dialog and idx % 250 == 0:
+                progress.update(35 + int((idx / total) * 55), f"Writing channel {idx + 1} of {total}...")
+            stream_id = item.get("stream_id")
+            if stream_id is None:
+                continue
+            name = m3u_escape(item.get("name") or "Unknown")
+            logo = m3u_escape(item.get("stream_icon") or "")
+            cat_id = str(item.get("category_id") or "")
+            group = m3u_escape(cat_names.get(cat_id) or cat_id or "Live TV")
+            tvg_id = m3u_escape(item.get("epg_channel_id") or item.get("tv_archive_id") or stream_id)
+            url = f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts"
+            lines.append(f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{name}" tvg-logo="{logo}" group-title="{group}",{name}')
+            lines.append(url)
+        os.makedirs(PROFILE_PATH, exist_ok=True)
+        with open(PVR_EXPORT_M3U_FILE, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+        info = [
+            "Bang TV Native PVR Guide Setup",
+            "",
+            "Use these with IPTV Simple Client if you want the real Kodi PVR grid guide:",
+            "",
+            "M3U playlist:",
+            PVR_EXPORT_M3U_FILE,
+            "",
+            "XMLTV guide URL:",
+            xtream_xmltv_url(),
+            "",
+            "After setting IPTV Simple Client, restart Kodi or reload PVR data, then open TV Guide again.",
+        ]
+        with open(PVR_EXPORT_INFO_FILE, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(info))
+        if show_dialog:
+            progress.update(100, "Done")
+            progress.close()
+            xbmcgui.Dialog().ok("Bang TV Native Guide", "Kodi's real PVR guide needs IPTV Simple Client.\n\nBang TV exported the files for it.\n\nM3U:\n{}\n\nXMLTV URL:\n{}\n\nAfter IPTV Simple is set up, this TV Guide button will open Kodi's native PVR guide.".format(PVR_EXPORT_M3U_FILE, xtream_xmltv_url()))
+        return True
+    except Exception as exc:
+        try:
+            if show_dialog:
+                progress.close()
+        except Exception:
+            pass
+        log(f"PVR export failed: {exc}", xbmc.LOGERROR)
+        notify("Native guide export failed", icon=xbmcgui.NOTIFICATION_ERROR)
+        return False
+
+
+def open_native_tv_guide() -> None:
+    """Deprecated wrapper kept for old shortcuts. The guide now stays inside Bang TV."""
+    list_tv_guide_categories()
+
+
+
+# -----------------------------------------------------------------------------
+# In-add-on visual TV guide
+# -----------------------------------------------------------------------------
+
+def guide_time_label(ts: int) -> str:
+    try:
+        return time.strftime("%I:%M %p", time.localtime(int(ts))).lstrip("0")
+    except Exception:
+        return ""
+
+
+def guide_current_program(rows: List[Dict[str, Any]], at_time: Optional[int] = None) -> Dict[str, Any]:
+    now = int(at_time or time.time())
+    for row in rows or []:
+        try:
+            if int(row.get("start") or 0) <= now < int(row.get("stop") or 0):
+                return row
+        except Exception:
+            continue
+    for row in rows or []:
+        try:
+            if int(row.get("stop") or 0) >= now:
+                return row
+        except Exception:
+            continue
+    return {}
+
+
+
+def get_live_guide_categories_quick() -> List[Dict[str, str]]:
+    """Return Live TV categories for the in-window guide category picker.
+
+    Uses existing API cache first so the visual guide can open immediately and the
+    category picker does not force a full directory reload.
+    """
+    out: List[Dict[str, str]] = [{"category_id": "", "category_name": "All Channels"}]
+    try:
+        url = xc_api_url("player_api.php?action=get_live_categories")
+        data = get_cached_json_any_age(url)
+        if data is None:
+            data = http_get_json(url, timeout=15, use_cache=True, silent=True)
+        if isinstance(data, list):
+            for cat in sorted_items(data, "category_name"):
+                cat_id = str(cat.get("category_id") or "")
+                name = str(cat.get("category_name") or "Unknown")
+                if cat_id and not hidden_live_is_hidden(cat_id):
+                    out.append({"category_id": cat_id, "category_name": name})
+    except Exception as exc:
+        log(f"Guide category picker failed: {exc}", xbmc.LOGWARNING)
+    return out
+
+
+
+def guide_skin_safe_dimensions(win: Any) -> Tuple[int, int]:
+    """Return safe guide dimensions for different Kodi skins and resolutions."""
+    try:
+        w = int(win.getWidth() or 0)
+        h = int(win.getHeight() or 0)
+    except Exception:
+        w, h = 0, 0
+    if w < 800 or h < 480:
+        try:
+            w = int(xbmc.getInfoLabel('System.ScreenWidth') or 0)
+            h = int(xbmc.getInfoLabel('System.ScreenHeight') or 0)
+        except Exception:
+            w, h = 0, 0
+    if w < 800 or h < 480:
+        w, h = 1280, 720
+    return w, h
+
+def guide_font(name: str = 'font12') -> str:
+    """Keep font use conservative so the custom guide works across skins."""
+    return name or 'font12'
+
+class BangTVGuideWindow(xbmcgui.WindowDialog):
+    """A TiviMate/PVR-style visual guide rendered inside the add-on.
+
+    v1.0.17 changes the guide from a full redraw model to persistent controls.
+    Moving up/down or left/right now updates existing labels and the selected
+    highlight only, instead of removing and rebuilding the whole window.
+    """
+
+    def __init__(self, channels: List[Dict[str, Any]], title: str = "TV Guide", categories: Optional[List[Dict[str, str]]] = None, cat_id: str = ""):
+        super(BangTVGuideWindow, self).__init__()
+        self.channels = channels or []
+        self.title = title or "TV Guide"
+        self.controls: List[Any] = []
+        self.selected = 0
+        self.offset = 0
+        self.window_start = self._round_half_hour(int(time.time()))
+        self.slot_minutes = 30
+        self.visible_rows = 9
+        self.visible_slots = 6
+        self._closed_by_play = False
+        self.categories = categories or []
+        self.cat_id = str(cat_id or "")
+        self.next_category_id = None
+        self.next_category_title = None
+        self._built = False
+        self._layout = {}
+        self._row_controls: List[Dict[str, Any]] = []
+        self._slot_controls: List[Any] = []
+        self._panel = {}
+        self._time_labels: List[Any] = []
+        self._selected_bar = None
+        self._now_marker = None
+
+    def _round_half_hour(self, ts: int) -> int:
+        return ts - (ts % (30 * 60))
+
+    def _add(self, control: Any) -> Any:
+        self.addControl(control)
+        self.controls.append(control)
+        return control
+
+    def _safe_set_label(self, control: Any, text: str) -> None:
+        try:
+            control.setLabel(text or "")
+        except Exception:
+            pass
+
+    def _safe_set_image(self, control: Any, image: str) -> None:
+        try:
+            control.setImage(image or ADDON_ICON)
+        except Exception:
+            pass
+
+    def _safe_set_visible(self, control: Any, visible: bool) -> None:
+        try:
+            control.setVisible(bool(visible))
+        except Exception:
+            pass
+
+    def _safe_set_pos(self, control: Any, x: int, y: int, w: Optional[int] = None, h: Optional[int] = None) -> None:
+        try:
+            if w is not None and h is not None:
+                control.setPosition(x, y)
+                control.setWidth(w)
+                control.setHeight(h)
+            else:
+                control.setPosition(x, y)
+        except Exception:
+            try:
+                control.setPosition(x, y)
+            except Exception:
+                pass
+
+    def _label(self, x: int, y: int, w: int, h: int, text: str, color: str = "0xFFFFFFFF", font: str = "font12", align: int = 0) -> Any:
+        return self._add(xbmcgui.ControlLabel(x, y, w, h, text, font=font, textColor=color, alignment=align))
+
+    def _image(self, x: int, y: int, w: int, h: int, img: str, color: Optional[str] = None) -> Any:
+        if color:
+            return self._add(xbmcgui.ControlImage(x, y, w, h, img or ADDON_ICON, colorDiffuse=color))
+        return self._add(xbmcgui.ControlImage(x, y, w, h, img or ADDON_ICON))
+
+    def onInit(self):
+        self._build_once()
+        self._update_all()
+
+    def _build_once(self) -> None:
+        if self._built:
+            return
+        w, h = guide_skin_safe_dimensions(self)
+        panel_h = max(128, min(190, int(h * 0.26)))
+        y0 = panel_h
+        time_h = max(32, int(h * 0.052))
+        row_h = max(38, min(52, int((h - y0 - time_h - 10) / 9)))
+        self.visible_rows = max(5, min(12, int((h - y0 - time_h - 10) / row_h)))
+        self.visible_slots = 5 if w < 1100 else 6
+        idx_w = max(34, int(w * 0.035))
+        chan_w = max(205, min(310, int(w * 0.235)))
+        grid_x = idx_w + chan_w
+        grid_w = max(360, w - grid_x - 18)
+        slot_w = max(90, int(grid_w / float(self.visible_slots)))
+        self._layout = {"w": w, "h": h, "y0": y0, "time_h": time_h, "row_h": row_h, "idx_w": idx_w, "chan_w": chan_w, "grid_x": grid_x, "grid_w": grid_w, "slot_w": slot_w}
+
+        self._image(0, 0, w, y0, "special://home/addons/plugin.video.bangtv/icon.png", "0x88202A2E")
+        self._panel["icon"] = self._image(16, 10, max(220, int(w * 0.28)), max(96, y0 - 28), ADDON_ICON)
+        panel_x = max(260, int(w * 0.32))
+        self._panel["title"] = self._label(panel_x, 18, w - panel_x - 25, 32, "", "0xFFFFFFFF", guide_font("font16"))
+        self._panel["time"] = self._label(panel_x, 55, max(260, int(w * 0.36)), 26, "", "0xFFB8C0C4", guide_font("font12"))
+        self._panel["cat"] = self._label(max(panel_x, w - 360), 55, 330, 26, "", "0xFFFFFFFF", guide_font("font12"), align=2)
+        self._panel["desc"] = self._label(panel_x, 84, w - panel_x - 25, max(42, y0 - 102), "", "0xFFB8C0C4", guide_font("font12"))
+        self._panel["help"] = self._label(max(panel_x, w - 430), 18, 400, 28, "OK Play  |  Left/Right Time  |  Menu Categories", "0xFFB8C0C4", guide_font("font10"), align=2)
+
+        self._image(0, y0, w, h - y0, "special://home/addons/plugin.video.bangtv/icon.png", "0xDD142024")
+        self._panel["date"] = self._label(16, y0 + 8, 220, 26, "", "0xFF8CCBFF", "font12")
+        for i in range(self.visible_slots):
+            x = grid_x + i * slot_w
+            self._time_labels.append(self._label(x, y0 + 8, slot_w - 4, 26, "", "0xFFB8C0C4", "font12"))
+        self._image(0, y0 + time_h - 1, w, 1, "special://home/addons/plugin.video.bangtv/icon.png", "0xFF62717A")
+
+        # One movable selected overlay, this avoids changing every row background on navigation.
+        self._selected_bar = self._image(0, y0 + time_h, w, row_h - 1, "special://home/addons/plugin.video.bangtv/icon.png", "0xAA1F5A82")
+
+        for r in range(self.visible_rows):
+            y = y0 + time_h + r * row_h
+            bg = "0x99223039" if r % 2 == 0 else "0x9918252B"
+            self._image(0, y, w, row_h - 1, "special://home/addons/plugin.video.bangtv/icon.png", bg)
+            row = {
+                "idx": self._label(16, y + 11, 30, 24, "", "0xFFFFFFFF", "font12"),
+                "icon": self._image(52, y + 7, 48, 30, ADDON_ICON),
+                "name": self._label(108, y + 10, chan_w - 70, 25, "", "0xFFFFFFFF", "font12"),
+                "slots": []
+            }
+            for c in range(self.visible_slots):
+                x = grid_x + c * slot_w
+                cell_bg = self._image(x, y + 1, slot_w - 2, row_h - 3, "special://home/addons/plugin.video.bangtv/icon.png", "0x66304045")
+                cell_label = self._label(x + 8, y + 12, slot_w - 14, 22, "", "0xFFB8C0C4", "font12")
+                row["slots"].append((cell_bg, cell_label))
+            self._row_controls.append(row)
+
+        self._now_marker = self._image(grid_x, y0 + time_h, 2, self.visible_rows * row_h, "special://home/addons/plugin.video.bangtv/icon.png", "0xFF4AA3FF")
+        self._built = True
+
+    def _program_for_slot(self, rows: List[Dict[str, Any]], slot_start: int, slot_stop: int) -> Dict[str, Any]:
+        best = {}
+        best_overlap = 0
+        for row in rows or []:
+            try:
+                start = int(row.get("start") or 0)
+                stop = int(row.get("stop") or 0)
+            except Exception:
+                continue
+            overlap = max(0, min(stop, slot_stop) - max(start, slot_start))
+            if overlap > best_overlap:
+                best = row
+                best_overlap = overlap
+        return best
+
+    def _update_panel(self) -> None:
+        channel = self.channels[self.selected] if self.channels else {}
+        rows = channel.get("guide_rows") or []
+        current = guide_current_program(rows, int(time.time()))
+        icon = str(channel.get("stream_icon") or ADDON_ICON)
+        prog_title = str(current.get("title") or "No current EPG")
+        start = int(current.get("start") or 0)
+        stop = int(current.get("stop") or 0)
+        desc = str(current.get("desc") or "")
+        cat = str(channel.get("category_name") or self.title or "Live TV")
+        mins = max(0, int((stop - start) / 60)) if start and stop else 0
+        time_line = f"{guide_time_label(start)} - {guide_time_label(stop)}        {mins} min" if start and stop else ""
+        self._safe_set_image(self._panel.get("icon"), icon)
+        self._safe_set_label(self._panel.get("title"), prog_title[:90])
+        self._safe_set_label(self._panel.get("time"), time_line)
+        self._safe_set_label(self._panel.get("cat"), cat[:42])
+        self._safe_set_label(self._panel.get("desc"), desc[:260])
+
+    def _update_time_header(self) -> None:
+        now = int(time.time())
+        self._safe_set_label(self._panel.get("date"), time.strftime("%a, %b %d, %I:%M %p", time.localtime(now)).replace(" 0", " "))
+        for i, lbl in enumerate(self._time_labels):
+            ts = self.window_start + i * self.slot_minutes * 60
+            self._safe_set_label(lbl, guide_time_label(ts))
+        lay = self._layout
+        total_secs = self.visible_slots * self.slot_minutes * 60
+        if self.window_start <= now <= self.window_start + total_secs:
+            x = lay["grid_x"] + int(((now - self.window_start) / float(total_secs)) * lay["grid_w"])
+            self._safe_set_pos(self._now_marker, x, lay["y0"] + lay["time_h"])
+            self._safe_set_visible(self._now_marker, True)
+        else:
+            self._safe_set_visible(self._now_marker, False)
+
+    def _update_selected_overlay(self) -> None:
+        lay = self._layout
+        visible_index = self.selected - self.offset
+        y = lay["y0"] + lay["time_h"] + max(0, min(self.visible_rows - 1, visible_index)) * lay["row_h"]
+        self._safe_set_pos(self._selected_bar, 0, y)
+
+    def _update_rows(self) -> None:
+        lay = self._layout
+        slot_seconds = self.slot_minutes * 60
+        for r, row_ctrl in enumerate(self._row_controls):
+            absolute = self.offset + r
+            if absolute >= len(self.channels):
+                self._safe_set_label(row_ctrl["idx"], "")
+                self._safe_set_label(row_ctrl["name"], "")
+                self._safe_set_image(row_ctrl["icon"], "")
+                for bg, lbl in row_ctrl["slots"]:
+                    self._safe_set_label(lbl, "")
+                    self._safe_set_visible(bg, False)
+                continue
+            channel = self.channels[absolute]
+            self._safe_set_label(row_ctrl["idx"], str(absolute + 1))
+            self._safe_set_image(row_ctrl["icon"], str(channel.get("stream_icon") or ADDON_ICON))
+            self._safe_set_label(row_ctrl["name"], str(channel.get("name") or "Live TV")[:32])
+            guide_rows = channel.get("guide_rows") or []
+            for c, (bg, lbl) in enumerate(row_ctrl["slots"]):
+                slot_start = self.window_start + c * slot_seconds
+                slot_stop = slot_start + slot_seconds
+                prog = self._program_for_slot(guide_rows, slot_start, slot_stop)
+                title = str(prog.get("title") or "") if prog else ""
+                self._safe_set_label(lbl, title[:26] if title else "")
+                self._safe_set_visible(bg, bool(title))
+
+    def _update_all(self) -> None:
+        self._update_time_header()
+        self._update_rows()
+        self._update_selected_overlay()
+        self._update_panel()
+
+    def _move(self, delta: int) -> None:
+        if not self.channels:
+            return
+        old_offset = self.offset
+        self.selected = max(0, min(len(self.channels) - 1, self.selected + delta))
+        if self.selected < self.offset:
+            self.offset = self.selected
+        if self.selected >= self.offset + self.visible_rows:
+            self.offset = self.selected - self.visible_rows + 1
+        if self.offset != old_offset:
+            self._update_rows()
+        self._update_selected_overlay()
+        self._update_panel()
+
+    def _shift_time(self, delta_slots: int) -> None:
+        self.window_start += delta_slots * self.slot_minutes * 60
+        min_start = self._round_half_hour(int(time.time()) - 60 * 60)
+        max_start = self._round_half_hour(int(time.time()) + 7 * 24 * 60 * 60)
+        self.window_start = max(min_start, min(max_start, self.window_start))
+        self._update_time_header()
+        self._update_rows()
+        self._update_panel()
+
+    def _choose_category(self) -> None:
+        """Switch guide category without going back through plugin folders."""
+        if not self.categories:
+            notify("No categories available", icon=xbmcgui.NOTIFICATION_ERROR)
+            return
+        labels = []
+        current_index = 0
+        for i, cat in enumerate(self.categories):
+            name = str(cat.get("category_name") or "Live TV")
+            cid = str(cat.get("category_id") or "")
+            if cid == self.cat_id:
+                current_index = i
+                labels.append(f"[B]{name}[/B]")
+            else:
+                labels.append(name)
+        idx = xbmcgui.Dialog().select("TV Guide Categories", labels, preselect=current_index)
+        if idx < 0 or idx >= len(self.categories):
+            return
+        chosen = self.categories[idx]
+        new_id = str(chosen.get("category_id") or "")
+        new_title = str(chosen.get("category_name") or "TV Guide")
+        if new_id == self.cat_id:
+            return
+        self.next_category_id = new_id
+        self.next_category_title = new_title
+        self.close()
+
+    def _play_selected(self) -> None:
+        if not self.channels:
+            return
+        channel = self.channels[self.selected]
+        url = channel.get("play_url") or ""
+        if not url:
+            notify("No stream URL for this channel", icon=xbmcgui.NOTIFICATION_ERROR)
+            return
+        recent_live_add(str(channel.get("name") or "Live TV"), channel.get("stream_id") or "", url, str(channel.get("stream_icon") or ""), str(channel.get("category_id") or ""), "", {"plot": "", "mediatype": "video"})
+        stream_health_mark(channel.get("stream_id") or "", True)
+        self._closed_by_play = True
+        self.close()
+        xbmc.Player().play(url)
+
+    def onAction(self, action):
+        aid = action.getId()
+        if aid in (9, 10, 92):  # back/menu/escape
+            self.close()
+        elif aid in (7,):  # select
+            self._play_selected()
+        elif aid in (11, 117):  # info/context menu opens category picker
+            self._choose_category()
+        elif aid in (1,):  # left
+            self._shift_time(-1)
+        elif aid in (2,):  # right
+            self._shift_time(1)
+        elif aid in (3,):  # up
+            self._move(-1)
+        elif aid in (4,):  # down
+            self._move(1)
+        elif aid in (5,):  # page up
+            self._move(-self.visible_rows)
+        elif aid in (6,):  # page down
+            self._move(self.visible_rows)
+
+
+def get_cached_metadata_any_age(content_type: str, item_id: Any) -> Dict[str, Any]:
+    """Read metadata cache without TTL so the TV Guide can open instantly.
+
+    The visual guide should never block on downloading/parsing XMLTV before the
+    window appears. Fresh guide rows can be filled by normal EPG/background
+    cache later, but opening the frame must be instant.
+    """
+    if item_id in (None, ""):
+        return {}
+    try:
+        key = metadata_cache_key(content_type, item_id)
+        with metadata_db() as conn:
+            row = conn.execute("SELECT data FROM metadata_cache WHERE cache_key=?", (key,)).fetchone()
+        if not row:
+            return {}
+        data = json.loads(row[0] or "{}")
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        log(f"SQLite metadata any-age read failed: {exc}", xbmc.LOGWARNING)
+        return {}
+
+
+def build_fast_visual_guide_channels(cat_id: str = "", title: str = "TV Guide", limit: int = 450) -> List[Dict[str, Any]]:
+    """Build the visual guide from already cached channel data only.
+
+    v1.0.18: opening the TV Guide must not fetch server data or parse the full
+    7 day XMLTV file. That caused the long wait before the guide appeared. This
+    function creates a lightweight grid immediately from cached live streams,
+    then uses any previously prepared programme rows if they already exist.
+    """
+    endpoint = "player_api.php?action=get_live_streams"
+    if cat_id:
+        endpoint += f"&category_id={quote(str(cat_id))}"
+    url = xc_api_url(endpoint)
+    data = get_cached_json_any_age(url)
+    if data is None:
+        # Last resort, a short cached API call. This is only for first ever guide
+        # use when nothing exists yet. It still avoids XMLTV parsing.
+        data = http_get_json(url, timeout=12, use_cache=True, silent=True)
+    if not isinstance(data, list):
+        data = []
+
+    prepared = get_cached_metadata_any_age("visual_guide_ready", cat_id or "all")
+    prepared_rows = {}
+    try:
+        for old in prepared.get("channels") or []:
+            sid = str(old.get("stream_id") or "")
+            if sid:
+                prepared_rows[sid] = old.get("guide_rows") or []
+    except Exception:
+        prepared_rows = {}
+
+    user, pwd, _label = get_effective_creds()
+    out: List[Dict[str, Any]] = []
+    for item in sorted_items(data)[:limit]:
+        stream_id = item.get("stream_id")
+        if stream_id is None:
+            continue
+        new_item = dict(item)
+        sid = str(stream_id)
+        new_item["guide_rows"] = prepared_rows.get(sid, [])
+        new_item["play_url"] = f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts"
+        if title and not new_item.get("category_name"):
+            new_item["category_name"] = title
+        out.append(new_item)
+    return out
+
+
+def open_visual_tv_guide(cat_id: str = "", title: str = "TV Guide") -> None:
+    if not has_saved_login():
+        notify("Login needed first", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    cat_id = str(cat_id or "")
+    title = title or ("All Channels" if not cat_id else "TV Guide")
+    try:
+        categories = get_live_guide_categories_quick()
+        out = build_fast_visual_guide_channels(cat_id, title)
+        if not out:
+            notify("Guide cache is empty. Open Live TV or press Refresh Live TV first.", icon=xbmcgui.NOTIFICATION_INFO)
+            return
+
+        # Save lightweight guide cache so the next open is instant too. Do not
+        # force XMLTV parsing here, that belongs in background/update paths.
+        metadata_cache_set("visual_guide_ready", cat_id or "all", {"channels": out, "title": title, "saved": int(time.time()), "fast_open": True})
+
+        win = BangTVGuideWindow(out, title or "TV Guide", categories=categories, cat_id=cat_id)
+        win.doModal()
+        next_id = win.next_category_id
+        next_title = win.next_category_title
+        del win
+        if next_id is not None:
+            open_visual_tv_guide(next_id, next_title or "TV Guide")
+    except Exception as exc:
+        log(f"Visual TV guide failed, falling back to folder guide: {exc}", xbmc.LOGERROR)
+        notify("Visual guide fallback mode", icon=xbmcgui.NOTIFICATION_INFO)
+        try:
+            list_tv_guide_channels(cat_id, title or "TV Guide")
+        except Exception:
+            notify("TV Guide could not open", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def list_tv_guide_categories() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "TV Guide")
+    xbmcplugin.setContent(HANDLE, "videos")
+    add_action("[B]All Channels Guide[/B]", "tv_guide_category", {"cat_id": "", "title": "All Channels"}, plot="Open the skin-safe guide view using normal Kodi controls. Works on all skins.")
+    add_action("Visual Grid Guide (experimental)", "tv_guide_visual", {"cat_id": "", "title": "All Channels"}, plot="Experimental custom visual guide. If your skin does not show it properly, use the normal TV Guide above.")
+    data = http_get_json_with_progress(xc_api_url("player_api.php?action=get_live_categories"), "Loading TV Guide categories...", timeout=25)
+    if isinstance(data, list):
+        for cat in sorted_items(data, "category_name"):
+            name = cat.get("category_name") or "Unknown"
+            cat_id = str(cat.get("category_id") or "")
+            if cat_id and not hidden_live_is_hidden(cat_id):
+                add_action(name, "tv_guide_category", {"cat_id": cat_id, "title": name}, plot="Open this category in the skin-safe TV Guide.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+
+def tv_guide_grid_label(channel_name: str, rows: List[Dict[str, Any]]) -> str:
+    """Build a PVR/TiviMate-inspired row label that stays inside Kodi plugin lists."""
+    now = int(time.time())
+    upcoming = []
+    for row in rows or []:
+        start = int(row.get("start") or 0)
+        stop = int(row.get("stop") or 0)
+        if stop >= now:
+            upcoming.append(row)
+        if len(upcoming) >= 3:
+            break
+    def fmt(row: Dict[str, Any], fallback: str) -> str:
+        if not row:
+            return fallback
+        start = int(row.get("start") or 0)
+        title = str(row.get("title") or "Programme")
+        return f"{format_local_time(start)} {title}"
+    col1 = fmt(upcoming[0], "No current EPG") if len(upcoming) > 0 else "No current EPG"
+    col2 = fmt(upcoming[1], "No next EPG") if len(upcoming) > 1 else "No next EPG"
+    col3 = fmt(upcoming[2], "") if len(upcoming) > 2 else ""
+    return f"[B]{channel_name}[/B]   |   {col1}   |   {col2}" + (f"   |   {col3}" if col3 else "")
+
+
+def tv_guide_grid_plot(channel_name: str, rows: List[Dict[str, Any]]) -> str:
+    lines = [channel_name, "", "TV Guide row layout:", "Channel | Now | Next | Later", ""]
+    if not rows:
+        lines.append("No XMLTV 7 day guide data found for this channel yet.")
+        return "\n".join(lines)
+    last_day = ""
+    for row in rows[:20]:
+        start = int(row.get("start") or 0)
+        stop = int(row.get("stop") or 0)
+        day = time.strftime("%A %d %b", time.localtime(start))
+        if day != last_day:
+            lines.append(day)
+            last_day = day
+        lines.append(f"  {format_local_time(start)} - {format_local_time(stop)}  {row.get('title') or 'Programme'}")
+    return "\n".join(lines)
+
+def list_tv_guide_channels(cat_id: str = "", title: str = "TV Guide", page: int = 1) -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "TV Guide - " + (title or "Live TV"))
+    xbmcplugin.setContent(HANDLE, "videos")
+    endpoint = "player_api.php?action=get_live_streams"
+    if cat_id:
+        endpoint += f"&category_id={quote(cat_id)}"
+    url = xc_api_url(endpoint)
+    data = get_cached_json_any_age(url)
+    if data is None:
+        data = http_get_json_with_progress(url, "Loading TV Guide channels...", timeout=30, force_refresh=False)
+    if not isinstance(data, list) or not data:
+        add_action("No TV Guide channels found", "tv_guide")
+        xbmcplugin.endOfDirectory(HANDLE)
+        return
+    guide = xmltv_guide_data(xtream_xmltv_url(), "xtream_7day_guide")
+    all_items = sorted_items(data)
+    page = safe_page(page)
+    items, has_next = paged_items(all_items, page)
+    user, pwd, _label = get_effective_creds()
+    for item in items:
+        stream_id = item.get("stream_id")
+        if stream_id is None:
+            continue
+        name = item.get("name") or "Unknown"
+        icon = item.get("stream_icon") or ADDON_ICON
+        rows = guide_programmes_for_item(item, guide)
+        plot = tv_guide_grid_plot(name, rows)
+        label = tv_guide_grid_label(name, rows)
+        context = [("Play Channel", f'RunPlugin({build_url({"mode": "play", "id": save_play_link(f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts"), "live_id": str(stream_id), "name": name, "thumb": icon, "cat_id": cat_id, "epg_plot": plot[:1500]})})')]
+        add_folder(label, "tv_guide_channel", {"stream_id": stream_id, "cat_id": cat_id, "title": name, "thumb": icon}, icon, plot, context_items=context)
+    if has_next:
+        add_folder(f"Next page ({page + 1})", "tv_guide_category", {"cat_id": cat_id, "title": title or "TV Guide", "page": page + 1}, ADDON_ICON, "Show the next page of TV Guide channels.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def list_tv_guide_channel(stream_id: Any, cat_id: str = "", title: str = "Live TV", thumb: str = "") -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "TV Guide - " + (title or "Live TV"))
+    xbmcplugin.setContent(HANDLE, "videos")
+    user, pwd, _label = get_effective_creds()
+    stream_id_text = str(stream_id or "")
+    if not stream_id_text:
+        add_action("No channel selected", "tv_guide")
+        xbmcplugin.endOfDirectory(HANDLE)
+        return
+    play = f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id_text}.ts"
+    guide = xmltv_guide_data(xtream_xmltv_url(), "xtream_7day_guide")
+    item = {"stream_id": stream_id_text, "name": title}
+    # Add richer matching data from the cached channel row when possible.
+    endpoint = "player_api.php?action=get_live_streams"
+    if cat_id:
+        endpoint += f"&category_id={quote(cat_id)}"
+    cached = get_cached_json_any_age(xc_api_url(endpoint))
+    if isinstance(cached, list):
+        for row in cached:
+            if str(row.get("stream_id") or "") == stream_id_text:
+                item.update(row)
+                thumb = thumb or row.get("stream_icon") or ""
+                break
+    rows = guide_programmes_for_item(item, guide)
+    now_plot = guide_now_next_text(rows)
+    add_playable("▶ Play Channel Now", play, thumb or ADDON_ICON, now_plot or "Play this Live TV channel.", None, {"plot": now_plot or "Play this Live TV channel.", "mediatype": "video"}, live_stream_id=stream_id_text, live_category_id=cat_id)
+    if not rows:
+        short = live_epg(stream_id_text)
+        if short.get("plot"):
+            add_action("Current EPG", "tv_guide_channel", {"stream_id": stream_id_text, "cat_id": cat_id, "title": title, "thumb": thumb}, thumb or ADDON_ICON, short.get("plot") or "")
+        else:
+            add_action("No 7 day EPG found for this channel", "tv_guide", plot="The provider has not supplied XMLTV guide data for this channel yet.")
+        xbmcplugin.endOfDirectory(HANDLE)
+        return
+    last_day = ""
+    for row in rows:
+        start = int(row.get("start") or 0)
+        stop = int(row.get("stop") or 0)
+        day = time.strftime("%A %d %b", time.localtime(start))
+        prefix = ""
+        if day != last_day:
+            prefix = f"[B]{day}[/B] - "
+            last_day = day
+        label = f"{prefix}{format_local_time(start)} - {format_local_time(stop)}  {row.get('title') or 'Programme'}"
+        plot_lines = [label.replace("[B]", "").replace("[/B]", "")]
+        if row.get("category"):
+            plot_lines.append("Category: " + str(row.get("category")))
+        if row.get("desc"):
+            plot_lines.append("")
+            plot_lines.append(str(row.get("desc")))
+        add_action(label, "tv_guide_channel", {"stream_id": stream_id_text, "cat_id": cat_id, "title": title, "thumb": thumb}, thumb or ADDON_ICON, "\n".join(plot_lines))
+    xbmcplugin.endOfDirectory(HANDLE)
+
 def list_nz_streams() -> None:
     xbmcplugin.setPluginCategory(HANDLE, "New Zealand Streams")
     xbmcplugin.setContent(HANDLE, "videos")
@@ -2794,6 +3639,7 @@ def tools_menu() -> None:
     add_action("Test connection", "connection_test", plot="Checks that Bang TV can connect to the Xtream Codes server with your saved login.")
     add_action("Live TV Help", "live_help", plot="Explains Live TV cache, background updates, High Activity Mode, Refresh Live TV and Update Category.")
     add_action("Server Dashboard", "live_dashboard", plot="Shows server, cache, update, change and High Activity Mode status.")
+    add_folder("Bang TV TV Guide", "tv_guide", plot="Opens the add-on TV Guide. This stays inside Bang TV and uses a grid-style Channel | Now | Next | Later layout.")
     add_action("Auto cleanup now", "auto_cleanup", plot="Removes old cache records, old health records and trims recent channel history.")
     add_action("Backup Bang TV settings", "backup_settings", plot="Backs up favourites, hidden categories, recent channels and Live TV update state.")
     add_action("Restore Bang TV settings", "restore_settings", plot="Restores the saved Bang TV user backup if one exists.")
@@ -2886,6 +3732,7 @@ def main_menu() -> None:
         _user, _pwd, label = get_effective_creds()
         add_action(f"Account: {label}", "account_status", plot="Shows your IPTV account status, expiry date and connection limits.")
     add_folder("Live TV", "live_categories", plot="Browse live IPTV channels with channel logos and Xtream EPG information.")
+    add_folder("TV Guide", "tv_guide", plot="Open the skin-safe Bang TV guide that works across Kodi skins. Uses normal Kodi folder controls with Channel | Now | Next | Later rows.")
     add_folder("Recently Watched", "recent_live", plot="Quickly reopen your recent Live TV channels.")
     add_folder("Movies", "vod_categories", plot="Browse movie categories, recently added movies, posters, descriptions, ratings and trailers.")
     add_folder("Series", "series_categories", plot="Browse TV show categories, seasons and episodes with cached metadata and episode descriptions.")
@@ -2915,6 +3762,10 @@ def router(paramstring: str) -> None:
         live_update_help()
     elif mode == "live_dashboard":
         live_dashboard()
+    elif mode == "setup_native_pvr_guide":
+        export_native_pvr_files(show_dialog=True)
+    elif mode == "native_tv_guide":
+        list_tv_guide_categories()
     elif mode == "auto_cleanup":
         live_auto_cleanup(True)
         xbmc.executebuiltin("Container.Refresh")
@@ -2978,6 +3829,19 @@ def router(paramstring: str) -> None:
         search_menu("series")
     elif mode == "live_categories":
         list_categories("get_live_categories", "live_streams", "Live TV")
+    elif mode == "tv_guide":
+        list_tv_guide_categories()
+        xbmcplugin.endOfDirectory(HANDLE)
+    elif mode == "tv_guide_fallback":
+        list_tv_guide_categories()
+    elif mode == "tv_guide_category":
+        list_tv_guide_channels(params.get("cat_id") or "", params.get("title") or "TV Guide", int(params.get("page") or 1))
+        xbmcplugin.endOfDirectory(HANDLE)
+    elif mode == "tv_guide_visual":
+        open_visual_tv_guide(params.get("cat_id") or "", params.get("title") or "TV Guide")
+        xbmcplugin.endOfDirectory(HANDLE)
+    elif mode == "tv_guide_channel":
+        list_tv_guide_channel(params.get("stream_id") or "", params.get("cat_id") or "", params.get("title") or "Live TV", params.get("thumb") or "")
     elif mode == "live_refresh":
         refresh_live_tv()
     elif mode == "live_stats":

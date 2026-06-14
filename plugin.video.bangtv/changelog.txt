@@ -1,3 +1,56 @@
+v1.0.20
+- TV Guide now defaults to a skin-safe Kodi folder guide that works across all skins.
+- Category guide rows use normal Kodi controls instead of a custom window.
+- Custom visual guide kept as experimental fallback option only.
+- TV Guide category paging fixed for skin-safe mode.
+
+v1.0.19
+- Made the in-add-on TV Guide more skin safe.
+- Guide layout now scales to different resolutions and skins.
+- Added fallback guide mode if a skin blocks custom guide controls.
+- No PVR required, TV Guide remains inside Bang TV.
+
+v1.0.18
+- TV Guide now opens from lightweight cached channel data first.
+- Removed blocking XMLTV parse before the guide window appears.
+- No long loading dialog for guide open when Live TV cache exists.
+- Category switching in the guide now uses fast cached channels.
+
+v1.0.17
+- Fixed visual TV Guide navigation so it no longer redraws the whole guide frame on every move.
+- Guide now uses persistent controls and only updates labels, selected highlight and visible rows.
+- Smoother up/down and left/right guide movement.
+
+v1.0.16
+- TV Guide opens straight into the visual grid instead of category folders.
+- Added in-guide category picker from the Menu/Context button.
+- Added prepared guide cache so repeat opens do not rebuild the whole guide every time.
+- Reduced annoying full reloads when switching guide categories.
+
+v1.0.15
+- Added an in-add-on visual TV Guide window inspired by TiviMate/PVR guide layouts.
+- Guide now uses channel rows, time blocks, current programme panel and left/right time navigation.
+- Selecting a channel in the visual guide plays it directly.
+- The guide stays inside Bang TV and does not require Kodi PVR/IPTV Simple Client.
+
+v1.0.14
+- TV Guide now stays inside Bang TV instead of opening Kodi PVR.
+- Added grid-style guide rows: Channel | Now | Next | Later.
+- Channel guide still opens 7 days ahead where XMLTV data is available.
+- Removed Native PVR setup from Tools to avoid confusion.
+
+v1.0.13
+- Changed main TV Guide to open Kodi native PVR-style TV guide window.
+- Added Tools > Setup Native PVR Guide to export Bang TV M3U and XMLTV details for IPTV Simple Client.
+- Kept the old add-on folder guide as Tools > Bang TV Folder Guide fallback.
+
+v1.0.12
+- Added main menu TV Guide.
+- Added category based TV Guide browsing.
+- Added 7 day ahead XMLTV guide view where provider EPG is available.
+- Clicking a TV Guide channel opens the programme list and includes Play Channel Now.
+- TV Guide channel rows show Now/Next info when matched.
+
 v1.0.11
 - Recently Watched Live TV now keeps and refreshes EPG/programme info.
 - Recent channels now show the same guide plot metadata where available.
