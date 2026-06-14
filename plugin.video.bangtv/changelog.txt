@@ -1,3 +1,9 @@
+v1.0.21
+- Fixed TV Guide navigation items so they open on all skins.
+- TV Guide categories now use proper folder items instead of action items.
+- Removed slow forced XMLTV parsing before the guide opens.
+- Removed duplicate end-of-directory calls for guide routes.
+
 v1.0.20
 - TV Guide now defaults to a skin-safe Kodi folder guide that works across all skins.
 - Category guide rows use normal Kodi controls instead of a custom window.

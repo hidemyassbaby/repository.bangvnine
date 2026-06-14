@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.13
+Version 1.0.21
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -42,7 +42,7 @@ DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.13",
+    "User-Agent": "Kodi BangTV/1.0.21",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -3058,19 +3058,30 @@ def open_visual_tv_guide(cat_id: str = "", title: str = "TV Guide") -> None:
 
 
 def list_tv_guide_categories() -> None:
+    """Skin-safe TV Guide landing page.
+
+    This must use folder items, not action items, because the guide screens are
+    directories. Some Kodi skins will not open a directory properly if the item
+    was added as non-folder/playable.
+    """
     xbmcplugin.setPluginCategory(HANDLE, "TV Guide")
     xbmcplugin.setContent(HANDLE, "videos")
-    add_action("[B]All Channels Guide[/B]", "tv_guide_category", {"cat_id": "", "title": "All Channels"}, plot="Open the skin-safe guide view using normal Kodi controls. Works on all skins.")
-    add_action("Visual Grid Guide (experimental)", "tv_guide_visual", {"cat_id": "", "title": "All Channels"}, plot="Experimental custom visual guide. If your skin does not show it properly, use the normal TV Guide above.")
-    data = http_get_json_with_progress(xc_api_url("player_api.php?action=get_live_categories"), "Loading TV Guide categories...", timeout=25)
-    if isinstance(data, list):
+    add_folder("[B]All Channels Guide[/B]", "tv_guide_category", {"cat_id": "", "title": "All Channels"}, ADDON_ICON, "Open the Bang TV guide using normal Kodi folder controls. Works on all skins.")
+    add_folder("Visual Grid Guide (experimental)", "tv_guide_visual", {"cat_id": "", "title": "All Channels"}, ADDON_ICON, "Optional experimental visual guide. Use the normal guide if your skin does not show it properly.")
+
+    data = get_cached_json_any_age(xc_api_url("player_api.php?action=get_live_categories"))
+    if data is None:
+        data = http_get_json_with_progress(xc_api_url("player_api.php?action=get_live_categories"), "Loading TV Guide categories...", timeout=25, force_refresh=False)
+
+    if isinstance(data, list) and data:
         for cat in sorted_items(data, "category_name"):
             name = cat.get("category_name") or "Unknown"
             cat_id = str(cat.get("category_id") or "")
             if cat_id and not hidden_live_is_hidden(cat_id):
-                add_action(name, "tv_guide_category", {"cat_id": cat_id, "title": name}, plot="Open this category in the skin-safe TV Guide.")
+                add_folder(name, "tv_guide_category", {"cat_id": cat_id, "title": name}, cat.get("stream_icon") or ADDON_ICON, "Open this category in the Bang TV guide.")
+    else:
+        add_action("No guide categories found. Open Live TV or Refresh Live TV first.", "tv_guide")
     xbmcplugin.endOfDirectory(HANDLE)
-
 
 
 def tv_guide_grid_label(channel_name: str, rows: List[Dict[str, Any]]) -> str:
@@ -3126,7 +3137,10 @@ def list_tv_guide_channels(cat_id: str = "", title: str = "TV Guide", page: int 
         add_action("No TV Guide channels found", "tv_guide")
         xbmcplugin.endOfDirectory(HANDLE)
         return
-    guide = xmltv_guide_data(xtream_xmltv_url(), "xtream_7day_guide")
+    # Do not force-download or parse the full XMLTV guide just to open this list.
+    # That made the guide look broken or very slow on some skins. Use cached EPG
+    # if available, otherwise show the channels immediately and fill EPG later.
+    guide = get_cached_metadata_any_age("epg_guide", "xtream_7day_guide") or {"channels": {}, "programmes": {}}
     all_items = sorted_items(data)
     page = safe_page(page)
     items, has_next = paged_items(all_items, page)
@@ -3831,15 +3845,12 @@ def router(paramstring: str) -> None:
         list_categories("get_live_categories", "live_streams", "Live TV")
     elif mode == "tv_guide":
         list_tv_guide_categories()
-        xbmcplugin.endOfDirectory(HANDLE)
     elif mode == "tv_guide_fallback":
         list_tv_guide_categories()
     elif mode == "tv_guide_category":
         list_tv_guide_channels(params.get("cat_id") or "", params.get("title") or "TV Guide", int(params.get("page") or 1))
-        xbmcplugin.endOfDirectory(HANDLE)
     elif mode == "tv_guide_visual":
         open_visual_tv_guide(params.get("cat_id") or "", params.get("title") or "TV Guide")
-        xbmcplugin.endOfDirectory(HANDLE)
     elif mode == "tv_guide_channel":
         list_tv_guide_channel(params.get("stream_id") or "", params.get("cat_id") or "", params.get("title") or "Live TV", params.get("thumb") or "")
     elif mode == "live_refresh":
