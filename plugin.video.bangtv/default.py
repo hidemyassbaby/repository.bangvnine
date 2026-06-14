@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.21
+Version 1.0.25
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -39,10 +39,12 @@ TMDB_PROXY = "https://bangtvkodi.thomasnz.workers.dev"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/original"
 NZ_M3U_URL = "https://i.mjh.nz/nz/raw-tv.m3u8"
 DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
+SKYGO_EPG_URL = "https://raw.githubusercontent.com/matthuisman/i.mjh.nz/refs/heads/master/SkyGo/epg.xml"
+SKYGO_EPG_CATEGORY_IDS = {"317"}  # VIP | Sky Sport NZ
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.21",
+    "User-Agent": "Kodi BangTV/1.0.25",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -72,8 +74,12 @@ RECENT_LIVE_FILE = os.path.join(PROFILE_PATH, "recent_live.json")
 HIDDEN_LIVE_CATEGORIES_FILE = os.path.join(PROFILE_PATH, "hidden_live_categories.json")
 STREAM_HEALTH_FILE = os.path.join(PROFILE_PATH, "stream_health.json")
 BACKUP_FILE = os.path.join(PROFILE_PATH, "bangtv_user_backup.json")
+NOTIFICATIONS_FILE = os.path.join(PROFILE_PATH, "bangtv_notifications.json")
+ACTIVITY_LOG_FILE = os.path.join(PROFILE_PATH, "bangtv_activity_log.json")
+STATISTICS_FILE = os.path.join(PROFILE_PATH, "bangtv_statistics.json")
 PVR_EXPORT_M3U_FILE = os.path.join(PROFILE_PATH, "bangtv_pvr_channels.m3u8")
 PVR_EXPORT_INFO_FILE = os.path.join(PROFILE_PATH, "bangtv_pvr_guide_setup.txt")
+MANUAL_EPG_FILE = os.path.join(PROFILE_PATH, "manual_epg_map.json")
 LIVE_AUTO_CHECK_SECONDS = 30 * 60
 LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
 LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD = 20
@@ -936,6 +942,13 @@ def smart_live_check(force: bool = False, show_notice: bool = False, progress: O
     state["last_check"] = now
     state["last_result"] = result
     save_live_update_state(state)
+    try:
+        chn = result.get("channel_changes") if isinstance(result.get("channel_changes"), dict) else {}
+        total = int(chn.get("added_count", 0) or 0) + int(chn.get("removed_count", 0) or 0) + int(chn.get("changed_count", 0) or 0)
+        if total:
+            add_bang_notification(f"Playlist changed: +{int(chn.get('added_count', 0) or 0)}, -{int(chn.get('removed_count', 0) or 0)}, changed {int(chn.get('changed_count', 0) or 0)}", "Updates")
+    except Exception:
+        pass
     if show_notice:
         ch = result.get("channel_changes") if isinstance(result.get("channel_changes"), dict) else {}
         added = int(ch.get("added_count", 0) or 0)
@@ -1279,6 +1292,85 @@ def norm_epg_key(value: Any) -> str:
     return text
 
 
+def epg_alias_keys(value: Any) -> List[str]:
+    """Return forgiving lookup keys for provider names vs XMLTV names.
+
+    Some playlists add labels such as VIP, NZ, HD, FHD or pipe prefixes while
+    the SkyGo XMLTV feed uses cleaner channel names. These aliases let a
+    channel like 'VIP | Sky Sport NZ 1 FHD' match 'Sky Sport 1'.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    variants = {raw}
+    no_brackets = re.sub(r"\[[^\]]+\]|\([^\)]+\)", " ", raw)
+    variants.add(no_brackets)
+    for part in re.split(r"[|/\\>-]", raw):
+        part = part.strip()
+        if part:
+            variants.add(part)
+    cleaned: set = set()
+    for item in list(variants):
+        text = re.sub(r"\b(VIP|NZ|NEW ZEALAND|FHD|HD|SD|UHD|4K|HEVC|H265|H264|1080P|720P|RAW|LIVE)\b", " ", item, flags=re.I)
+        text = re.sub(r"\s+", " ", text).strip()
+        if text:
+            cleaned.add(text)
+        # Sky Sport NZ 1 -> Sky Sport 1, Sky Sports 1 -> Sky Sport 1
+        text2 = re.sub(r"\bSky\s+Sports\b", "Sky Sport", text, flags=re.I)
+        text2 = re.sub(r"\bSky\s+Sport\s+NZ\b", "Sky Sport", text2, flags=re.I)
+        text2 = re.sub(r"\s+", " ", text2).strip()
+        if text2:
+            cleaned.add(text2)
+    keys: List[str] = []
+    for item in list(variants) + list(cleaned):
+        for key in (item, norm_epg_key(item)):
+            if key and key not in keys:
+                keys.append(key)
+    return keys
+
+
+def is_sky_sport_nz_live_item(item: Dict[str, Any], category_title: str = "", cat_id: str = "") -> bool:
+    """True when this row/category should use Matt Huisman's SkyGo EPG.
+
+    VIP | Sky Sport NZ is explicitly mapped to category 317.  Name matching is
+    kept as a backup because some servers rename the category or channels.
+    """
+    cid = str(cat_id or item.get("category_id") or item.get("cat_id") or "").strip()
+    if cid in SKYGO_EPG_CATEGORY_IDS:
+        return True
+    text = " ".join([
+        str(category_title or ""),
+        str(item.get("category_name") or ""),
+        str(item.get("group-title") or ""),
+        str(item.get("name") or ""),
+        str(item.get("epg_channel_id") or ""),
+        str(item.get("tvg_id") or ""),
+    ]).lower()
+    return "sky" in text and "sport" in text and ("nz" in text or "new zealand" in text or "vip" in text)
+
+
+def combined_epg_map_for_live_items(items: List[Dict[str, Any]], category_title: str = "", cat_id: str = "") -> Dict[str, Dict[str, str]]:
+    """Build the right Now/Next EPG map for the current Live TV list.
+
+    Xtream XMLTV remains the default. If the current category/list contains
+    VIP | Sky Sport NZ style channels, merge in Matt Huisman's SkyGo XMLTV feed
+    so those channels can show reliable Sky Sport NZ guide data.
+    """
+    epg_map = xmltv_epg_map(xtream_xmltv_url(), "xtream_live")
+    try:
+        if str(cat_id or "") in SKYGO_EPG_CATEGORY_IDS or any(is_sky_sport_nz_live_item(i, category_title, cat_id) for i in items or []):
+            sky_map = xmltv_epg_map(SKYGO_EPG_URL, "skygo_live")
+            if sky_map:
+                merged = dict(epg_map)
+                merged.update(sky_map)
+                add_notification("Sky Sport NZ EPG available", "Sky GO NZ EPG feed is being used for VIP | Sky Sport NZ, category 317.", "updates")
+                activity_add("Sky Sport NZ EPG loaded from Sky GO NZ feed", "updates")
+                return merged
+    except Exception as exc:
+        log(f"Sky Sport NZ EPG merge failed: {exc}", xbmc.LOGWARNING)
+    return epg_map
+
+
 def xmltv_epg_map(epg_url: str, cache_key: str = "live_xmltv") -> Dict[str, Dict[str, str]]:
     """Build a reusable XMLTV Now/Next map, the same style used by New Zealand Streams."""
     if not epg_url or not setting_bool("show_epg", True):
@@ -1352,6 +1444,9 @@ def xmltv_epg_map(epg_url: str, cache_key: str = "live_xmltv") -> Dict[str, Dict
         keys = [ch] + channel_names.get(ch, [])
         for key in keys:
             if key:
+                for alias in epg_alias_keys(key):
+                    if alias:
+                        result[alias] = value
                 result[key] = value
                 nkey = norm_epg_key(key)
                 if nkey:
@@ -1362,6 +1457,9 @@ def xmltv_epg_map(epg_url: str, cache_key: str = "live_xmltv") -> Dict[str, Dict
 
 
 def live_item_epg_from_map(item: Dict[str, Any], epg_map: Dict[str, Dict[str, str]]) -> Dict[str, str]:
+    manual = manual_epg_now_next(item)
+    if manual:
+        return manual
     if not epg_map:
         return {}
     name = item.get("name") or ""
@@ -1376,9 +1474,14 @@ def live_item_epg_from_map(item: Dict[str, Any], epg_map: Dict[str, Dict[str, st
     clean_name = re.sub(r"\b(FHD|HD|SD|UHD|4K|HEVC|H265|H264|1080P|720P)\b", "", str(name or ""), flags=re.I)
     clean_name = " ".join(clean_name.replace("|", " ").split())
     candidates.append(clean_name)
+    expanded: List[str] = []
     for key in candidates:
         if key in (None, ""):
             continue
+        for alias in epg_alias_keys(key):
+            if alias and alias not in expanded:
+                expanded.append(alias)
+    for key in expanded:
         direct = epg_map.get(str(key))
         if direct:
             return direct
@@ -1788,6 +1891,395 @@ def write_json_file(path: str, data: Any) -> None:
 
 
 
+
+
+
+BUILTIN_EPG_SOURCES = {
+    "skygo": {
+        "label": "Sky GO NZ",
+        "url": SKYGO_EPG_URL,
+        "builtin": True,
+        "enabled": True,
+        "description": "Matt Huisman Sky GO NZ XMLTV feed for Sky Sport NZ and related channels.",
+    },
+}
+
+
+def ensure_builtin_epg_sources(data: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(data, dict):
+        data = {"sources": {}, "channels": {}}
+    sources = data.setdefault("sources", {})
+    if not isinstance(sources, dict):
+        data["sources"] = sources = {}
+    for sid, src in BUILTIN_EPG_SOURCES.items():
+        saved = sources.get(sid) if isinstance(sources.get(sid), dict) else {}
+        merged = dict(src)
+        merged.update(saved or {})
+        merged["label"] = src["label"]
+        merged["url"] = src["url"]
+        merged["builtin"] = True
+        merged.setdefault("enabled", True)
+        sources[sid] = merged
+    return data
+
+
+def manual_epg_load() -> Dict[str, Any]:
+    data = read_json_file(MANUAL_EPG_FILE, {"sources": {}, "channels": {}})
+    if not isinstance(data, dict):
+        data = {"sources": {}, "channels": {}}
+    if not isinstance(data.get("sources"), dict):
+        data["sources"] = {}
+    if not isinstance(data.get("channels"), dict):
+        data["channels"] = {}
+    return ensure_builtin_epg_sources(data)
+
+
+def manual_epg_save(data: Dict[str, Any]) -> None:
+    if not isinstance(data, dict):
+        data = {"sources": {}, "channels": {}}
+    data.setdefault("sources", {})
+    data.setdefault("channels", {})
+    write_json_file(MANUAL_EPG_FILE, data)
+
+
+def manual_epg_channel_key(stream_id: Any = "", name: str = "") -> str:
+    sid = str(stream_id or "").strip()
+    if sid:
+        return "stream:" + sid
+    return "name:" + norm_epg_key(name)
+
+
+def get_manual_epg_assignment(item: Dict[str, Any]) -> Dict[str, Any]:
+    data = manual_epg_load()
+    channels = data.get("channels") or {}
+    keys = [manual_epg_channel_key(item.get("stream_id") or item.get("live_id") or "", item.get("name") or "")]
+    name_key = manual_epg_channel_key("", item.get("name") or "")
+    if name_key not in keys:
+        keys.append(name_key)
+    for key in keys:
+        val = channels.get(key)
+        if isinstance(val, dict):
+            return val
+    return {}
+
+
+def manual_epg_source_url(source_id: str) -> str:
+    if source_id == "xtream":
+        return xtream_xmltv_url()
+    if source_id == "skygo":
+        return SKYGO_EPG_URL
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id)
+    return str((src or {}).get("url") or "") if isinstance(src, dict) else ""
+
+
+def manual_epg_guide_for_assignment(assign: Dict[str, Any]) -> Dict[str, Any]:
+    source_id = str(assign.get("source_id") or "")
+    url = str(assign.get("url") or "") or manual_epg_source_url(source_id)
+    if not url:
+        return {}
+    cache_key = "manual_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id or str(abs(hash(url))))[:80]
+    return xmltv_guide_data(url, cache_key)
+
+
+def manual_epg_now_next(item: Dict[str, Any]) -> Dict[str, str]:
+    assign = get_manual_epg_assignment(item)
+    if not assign:
+        return {}
+    guide = manual_epg_guide_for_assignment(assign)
+    programmes = guide.get("programmes") if isinstance(guide, dict) else {}
+    channel_id = str(assign.get("channel_id") or "")
+    if not isinstance(programmes, dict) or not channel_id:
+        return {}
+    return guide_now_next_text(programmes.get(channel_id, []) or {}) and {"plot": guide_now_next_text(programmes.get(channel_id, []) or [])} or {}
+
+
+def xmltv_channel_choices(url: str, cache_key: str) -> List[Tuple[str, str]]:
+    guide = xmltv_guide_data(url, cache_key)
+    channels = guide.get("channels") if isinstance(guide, dict) else {}
+    if not isinstance(channels, dict):
+        return []
+    choices = []
+    for ch_id, names in channels.items():
+        display = (names[0] if names else ch_id) if isinstance(names, list) else ch_id
+        choices.append((str(ch_id), str(display)))
+    choices.sort(key=lambda x: x[1].lower())
+    return choices
+
+
+def manual_epg_manager_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "EPG Manager")
+    data = manual_epg_load()
+    count = len(data.get("channels") or {})
+    source_count = len([s for s in (data.get("sources") or {}).values() if isinstance(s, dict) and s.get("url")])
+    add_folder(f"EPG Sources ({source_count})", "manual_epg_sources", plot="View built-in and custom XMLTV sources. Sky GO NZ is included by default.")
+    add_action("Refresh EPG Sources", "manual_epg_refresh_sources", plot="Download and cache enabled EPG sources now.")
+    add_action("Assign EPG by channel ID", "manual_epg_assign_prompt", plot="Enter a Live TV stream ID, choose an XMLTV source, then choose the matching EPG channel.")
+    add_folder(f"Channel Assignments ({count})", "manual_epg_assignments", plot="View and clear manually assigned EPG channel mappings.")
+    add_folder("Unassigned Channels", "manual_epg_unassigned", plot="Show cached Live TV channels that do not have a manual EPG assignment.")
+    add_folder("Missing EPG", "manual_epg_missing", plot="Show channels where no current EPG programme could be found.")
+    add_folder("Recently Assigned Channels", "manual_epg_recent", plot="Show recently mapped EPG channels.")
+    add_action("Add Custom XMLTV Source URL", "manual_epg_add_source", plot="Add any XMLTV URL, including .xml or .xml.gz feeds, then use it for manual channel mapping.")
+    add_action("Export EPG Mappings", "manual_epg_export", plot="Choose where to save your EPG mapping JSON file.")
+    add_action("Import EPG Mappings", "manual_epg_import", plot="Choose a saved EPG mapping JSON file to restore.")
+    add_action("Clear all manual EPG assignments", "manual_epg_clear_all", plot="Removes all manual EPG channel links. Does not delete normal EPG cache.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_sources_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "EPG Sources")
+    data = manual_epg_load()
+    sources = data.get("sources") or {}
+    for sid, src in sorted(sources.items(), key=lambda kv: str((kv[1] or {}).get("label") or kv[0]).lower()):
+        if not isinstance(src, dict):
+            continue
+        label = str(src.get("label") or sid)
+        url = str(src.get("url") or "")
+        if not url:
+            continue
+        enabled = bool(src.get("enabled", True))
+        built = "Built-in" if src.get("builtin") else "Custom"
+        status = "Enabled" if enabled else "Disabled"
+        plot = f"{built} EPG source\nStatus: {status}\nURL: {url}\n\nUse this source when assigning EPG to a channel."
+        add_action(f"{'⭐ ' if sid == 'skygo' else ''}{label} [{status}]", "manual_epg_source_info", {"source_id": sid}, plot=plot)
+    add_action("Add Custom XMLTV Source URL", "manual_epg_add_source")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_source_info(source_id: str) -> None:
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id)
+    url = str(src.get("url") or "")
+    guide = xmltv_guide_data(url, "source_info_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80]) if url else {}
+    channels = guide.get("channels") if isinstance(guide, dict) else {}
+    text = f"{label}\n\nURL:\n{url}\n\nStatus: {'Enabled' if src.get('enabled', True) else 'Disabled'}\nType: {'Built-in' if src.get('builtin') else 'Custom'}\nChannel count: {len(channels) if isinstance(channels, dict) else 0}\n\nThis source can be selected from a channel context menu using Assign EPG."
+    xbmcgui.Dialog().textviewer("EPG Source", text)
+
+
+def manual_epg_refresh_sources() -> None:
+    data = manual_epg_load()
+    sources = [(sid, src) for sid, src in (data.get("sources") or {}).items() if isinstance(src, dict) and src.get("url") and src.get("enabled", True)]
+    if not sources:
+        notify("No enabled EPG sources")
+        return
+    progress = xbmcgui.DialogProgress()
+    progress.create(ADDON_NAME, "Refreshing EPG sources...")
+    refreshed = 0
+    try:
+        for i, (sid, src) in enumerate(sources):
+            if progress.iscanceled():
+                break
+            label = str(src.get("label") or sid)
+            progress.update(int((i / max(1, len(sources))) * 100), "Refreshing EPG", label)
+            xmltv_guide_data(str(src.get("url") or ""), "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", str(sid))[:80])
+            refreshed += 1
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    add_bang_notification(f"EPG sources refreshed: {refreshed}", "Updates")
+    activity_add(f"EPG sources refreshed: {refreshed}", "updates")
+    notify(f"EPG sources refreshed: {refreshed}")
+
+
+def manual_epg_export() -> None:
+    data = manual_epg_load()
+    folder = xbmcgui.Dialog().browse(0, "Choose folder to save EPG mappings", "files")
+    if not folder:
+        notify("Export cancelled")
+        return
+    filename = f"BangTV_EPG_Mappings_{time.strftime('%Y-%m-%d_%H%M')}.json"
+    path = os.path.join(folder, filename)
+    write_json_file(path, data)
+    notify("EPG mappings exported")
+
+
+def manual_epg_import() -> None:
+    path = xbmcgui.Dialog().browse(1, "Choose EPG mappings JSON", "files", mask=".json")
+    if not path:
+        notify("Import cancelled")
+        return
+    data = read_json_file(path, {})
+    if not isinstance(data, dict):
+        notify("Invalid EPG mapping file", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    current = manual_epg_load()
+    current["sources"].update(data.get("sources") or {})
+    current["channels"].update(data.get("channels") or {})
+    manual_epg_save(ensure_builtin_epg_sources(current))
+    notify("EPG mappings imported")
+    xbmc.executebuiltin("Container.Refresh")
+
+
+def manual_epg_recent_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Recently Assigned EPG")
+    data = manual_epg_load()
+    rows = []
+    for key, val in (data.get("channels") or {}).items():
+        if isinstance(val, dict):
+            rows.append((int(val.get("updated", 0) or 0), key, val))
+    rows.sort(reverse=True)
+    for _ts, key, val in rows[:50]:
+        plot = f"Source: {val.get('source_label') or val.get('source_id')}\nEPG channel: {val.get('channel_label') or val.get('channel_id')}\nUpdated: {nice_time(int(val.get('updated', 0) or 0))}"
+        add_action(str(val.get("name") or key), "manual_epg_clear_one", {"key": key}, plot=plot)
+    if not rows:
+        add_action("No recently assigned EPG channels", "manual_epg_manager")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_unassigned_menu(missing_only: bool = False) -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Missing EPG" if missing_only else "Unassigned Channels")
+    # Use recently watched and cached category channels as a lightweight source list.
+    seen = {}
+    for item in recent_live_load():
+        sid = str(item.get("stream_id") or "")
+        if sid:
+            seen[sid] = {"stream_id": sid, "name": item.get("name") or sid, "thumb": item.get("thumb") or ""}
+    cache = load_cache()
+    for val in cache.values() if isinstance(cache, dict) else []:
+        if isinstance(val, list):
+            for item in val:
+                if isinstance(item, dict):
+                    sid = str(item.get("stream_id") or item.get("live_id") or "")
+                    if sid:
+                        seen.setdefault(sid, item)
+    added = 0
+    for sid, item in sorted(seen.items(), key=lambda kv: str(kv[1].get("name") or kv[0]).lower()):
+        if get_manual_epg_assignment(item):
+            continue
+        if missing_only and live_item_epg_from_map(item, combined_epg_map_for_live_items([item])).get("plot"):
+            continue
+        add_action(f"Assign: {item.get('name') or sid}", "manual_epg_assign", {"stream_id": sid, "name": item.get("name") or sid}, plot="No manual EPG assignment saved for this channel.")
+        added += 1
+        if added >= 200:
+            break
+    if not added:
+        add_action("No channels found here yet", "manual_epg_manager")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_assignments_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Manual EPG Assignments")
+    data = manual_epg_load()
+    channels = data.get("channels") or {}
+    if not channels:
+        add_action("No manual EPG assignments yet", "manual_epg_manager")
+    for key, val in sorted(channels.items()):
+        if not isinstance(val, dict):
+            continue
+        label = val.get("name") or key
+        plot = f"Stream: {val.get('stream_id') or key}\nEPG source: {val.get('source_label') or val.get('source_id')}\nEPG channel: {val.get('channel_label') or val.get('channel_id')}"
+        add_action(f"Clear: {label}", "manual_epg_clear_one", {"key": key}, plot=plot)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_add_source() -> None:
+    url = xbmcgui.Dialog().input("Custom XMLTV URL", type=xbmcgui.INPUT_ALPHANUM).strip()
+    if not url:
+        notify("No EPG URL added")
+        return
+    label = xbmcgui.Dialog().input("Source name", defaultt="Custom EPG", type=xbmcgui.INPUT_ALPHANUM).strip() or "Custom EPG"
+    data = manual_epg_load()
+    source_id = "custom_" + str(int(time.time()))
+    data.setdefault("sources", {})[source_id] = {"label": label, "url": url, "added": int(time.time())}
+    manual_epg_save(data)
+    notify("Custom EPG source added")
+    add_bang_notification(f"Custom EPG source added: {label}", "Updates")
+
+
+def manual_epg_source_select() -> Tuple[str, str, str]:
+    data = manual_epg_load()
+    options = [("xtream", "Provider XMLTV", xtream_xmltv_url()), ("skygo", "Sky GO NZ", SKYGO_EPG_URL)]
+    for sid, src in (data.get("sources") or {}).items():
+        if isinstance(src, dict):
+            options.append((str(sid), str(src.get("label") or sid), str(src.get("url") or "")))
+    labels = [o[1] for o in options if o[2]]
+    filtered = [o for o in options if o[2]]
+    if not filtered:
+        return "", "", ""
+    idx = xbmcgui.Dialog().select("Choose EPG source", labels)
+    if idx < 0:
+        return "", "", ""
+    return filtered[idx]
+
+
+def manual_epg_assign(stream_id: str = "", name: str = "") -> None:
+    sid = str(stream_id or "").strip()
+    if not sid:
+        sid = xbmcgui.Dialog().input("Live TV stream ID", type=xbmcgui.INPUT_NUMERIC).strip()
+    if not sid:
+        notify("No stream ID entered")
+        return
+    channel_name = name or xbmcgui.Dialog().input("Channel name", defaultt="Live TV Channel", type=xbmcgui.INPUT_ALPHANUM).strip() or sid
+    source_id, source_label, url = manual_epg_source_select()
+    if not url:
+        notify("EPG assignment cancelled")
+        return
+    progress = xbmcgui.DialogProgress()
+    progress.create(ADDON_NAME, "Loading EPG channels...", source_label)
+    try:
+        choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80])
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    if not choices:
+        notify("No XMLTV channels found", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    names = [f"{label}  [{ch_id}]" for ch_id, label in choices]
+    # Try to jump close to likely match.
+    default_idx = 0
+    target = norm_epg_key(channel_name)
+    for i, (_cid, label) in enumerate(choices):
+        if target and (target in norm_epg_key(label) or norm_epg_key(label) in target):
+            default_idx = i
+            break
+    idx = xbmcgui.Dialog().select("Choose matching EPG channel", names, preselect=default_idx)
+    if idx < 0:
+        notify("EPG assignment cancelled")
+        return
+    ch_id, ch_label = choices[idx]
+    data = manual_epg_load()
+    key = manual_epg_channel_key(sid, channel_name)
+    data.setdefault("channels", {})[key] = {
+        "stream_id": sid,
+        "name": channel_name,
+        "source_id": source_id,
+        "source_label": source_label,
+        "url": url,
+        "channel_id": ch_id,
+        "channel_label": ch_label,
+        "updated": int(time.time()),
+    }
+    manual_epg_save(data)
+    add_bang_notification(f"Manual EPG assigned: {channel_name} → {ch_label}", "Updates")
+    activity_add(f"Manual EPG assigned for {channel_name}", "updates")
+    notify("Manual EPG assigned")
+    xbmc.executebuiltin("Container.Refresh")
+
+
+def manual_epg_clear_one(key: str) -> None:
+    data = manual_epg_load()
+    if key in (data.get("channels") or {}):
+        data["channels"].pop(key, None)
+        manual_epg_save(data)
+        notify("Manual EPG assignment cleared")
+    xbmc.executebuiltin("Container.Refresh")
+
+
+def manual_epg_clear_all() -> None:
+    if not xbmcgui.Dialog().yesno(ADDON_NAME, "Clear all manual EPG assignments?"):
+        return
+    data = manual_epg_load()
+    data["channels"] = {}
+    manual_epg_save(data)
+    notify("Manual EPG assignments cleared")
+    xbmc.executebuiltin("Container.Refresh")
+
+
 def recent_live_load() -> List[Dict[str, str]]:
     data = read_json_file(RECENT_LIVE_FILE, [])
     return data if isinstance(data, list) else []
@@ -1955,6 +2447,9 @@ def backup_settings() -> None:
         "hidden_live_categories": hidden_live_load(),
         "stream_health": stream_health_load(),
         "live_update_state": load_live_update_state(),
+        "notifications": read_json_file(NOTIFICATIONS_FILE, []),
+        "activity_log": read_json_file(ACTIVITY_LOG_FILE, []),
+        "statistics": read_json_file(STATISTICS_FILE, {}),
     }
     write_json_file(BACKUP_FILE, data)
     xbmcgui.Dialog().ok(ADDON_NAME, f"Backup saved to:\n{BACKUP_FILE}")
@@ -1977,6 +2472,13 @@ def restore_settings() -> None:
         write_json_file(STREAM_HEALTH_FILE, data.get("stream_health"))
     if isinstance(data.get("live_update_state"), dict):
         save_live_update_state(data.get("live_update_state"))
+    if isinstance(data.get("notifications"), list):
+        write_json_file(NOTIFICATIONS_FILE, data.get("notifications"))
+    if isinstance(data.get("activity_log"), list):
+        write_json_file(ACTIVITY_LOG_FILE, data.get("activity_log"))
+    if isinstance(data.get("statistics"), dict):
+        write_json_file(STATISTICS_FILE, data.get("statistics"))
+    add_bang_notification("Quick backup restored", "Maintenance")
     notify("Backup restored")
 
 
@@ -2341,6 +2843,7 @@ def add_playable(name: str, play_url: str, thumb: str = "", plot: str = "", year
     context_items = []
     if live_stream_id:
         context_items.append((f"Stream health: {stream_health_status(live_stream_id)}", f'Notification({ADDON_NAME},Stream health: {stream_health_status(live_stream_id)},2500)'))
+        context_items.append(("Assign EPG to this channel", f'RunPlugin({build_url({"mode": "manual_epg_assign", "stream_id": str(live_stream_id), "name": name})})'))
     if play_url:
         if fav_is_saved(play_url):
             context_items.append(("Remove from Bang TV favourites", f'RunPlugin({build_url({"mode": "fav_remove_token", "id": token})})'))
@@ -2421,6 +2924,9 @@ def guide_match_ids(item: Dict[str, Any], guide: Dict[str, Any]) -> List[str]:
     channels = guide.get("channels") if isinstance(guide, dict) else {}
     if not isinstance(channels, dict):
         channels = {}
+    manual = get_manual_epg_assignment(item)
+    if manual.get("channel_id"):
+        return [str(manual.get("channel_id"))]
     name = item.get("name") or ""
     clean_name = re.sub(r"\b(FHD|HD|SD|UHD|4K|HEVC|H265|H264|1080P|720P)\b", "", str(name or ""), flags=re.I)
     clean_name = " ".join(clean_name.replace("|", " ").split())
@@ -2445,6 +2951,11 @@ def guide_match_ids(item: Dict[str, Any], guide: Dict[str, Any]) -> List[str]:
 
 
 def guide_programmes_for_item(item: Dict[str, Any], guide: Dict[str, Any]) -> List[Dict[str, Any]]:
+    manual = get_manual_epg_assignment(item)
+    if manual:
+        manual_guide = manual_epg_guide_for_assignment(manual)
+        if manual_guide:
+            guide = manual_guide
     programmes = guide.get("programmes") if isinstance(guide, dict) else {}
     if not isinstance(programmes, dict):
         return []
@@ -3141,6 +3652,17 @@ def list_tv_guide_channels(cat_id: str = "", title: str = "TV Guide", page: int 
     # That made the guide look broken or very slow on some skins. Use cached EPG
     # if available, otherwise show the channels immediately and fill EPG later.
     guide = get_cached_metadata_any_age("epg_guide", "xtream_7day_guide") or {"channels": {}, "programmes": {}}
+    try:
+        if str(cat_id or "") in SKYGO_EPG_CATEGORY_IDS or any(is_sky_sport_nz_live_item(i, title or "", cat_id) for i in data):
+            sky_guide = get_cached_metadata_any_age("epg_guide", "skygo_7day_guide") or xmltv_guide_data(SKYGO_EPG_URL, "skygo_7day_guide")
+            if isinstance(sky_guide, dict) and sky_guide.get("programmes"):
+                merged_channels = dict(guide.get("channels") or {})
+                merged_channels.update(sky_guide.get("channels") or {})
+                merged_programmes = dict(guide.get("programmes") or {})
+                merged_programmes.update(sky_guide.get("programmes") or {})
+                guide = {"channels": merged_channels, "programmes": merged_programmes}
+    except Exception as exc:
+        log(f"SkyGo guide merge failed: {exc}", xbmc.LOGWARNING)
     all_items = sorted_items(data)
     page = safe_page(page)
     items, has_next = paged_items(all_items, page)
@@ -3173,6 +3695,17 @@ def list_tv_guide_channel(stream_id: Any, cat_id: str = "", title: str = "Live T
     play = f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id_text}.ts"
     guide = xmltv_guide_data(xtream_xmltv_url(), "xtream_7day_guide")
     item = {"stream_id": stream_id_text, "name": title}
+    if is_sky_sport_nz_live_item(item, title or "", cat_id):
+        try:
+            sky_guide = xmltv_guide_data(SKYGO_EPG_URL, "skygo_7day_guide")
+            if isinstance(sky_guide, dict) and sky_guide.get("programmes"):
+                merged_channels = dict(guide.get("channels") or {})
+                merged_channels.update(sky_guide.get("channels") or {})
+                merged_programmes = dict(guide.get("programmes") or {})
+                merged_programmes.update(sky_guide.get("programmes") or {})
+                guide = {"channels": merged_channels, "programmes": merged_programmes}
+        except Exception as exc:
+            log(f"SkyGo 7 day channel guide failed: {exc}", xbmc.LOGWARNING)
     # Add richer matching data from the cached channel row when possible.
     endpoint = "player_api.php?action=get_live_streams"
     if cat_id:
@@ -3647,22 +4180,476 @@ def connection_test() -> None:
         notify("Connection failed", icon=xbmcgui.NOTIFICATION_ERROR)
 
 
+
+def add_activity(message: str, kind: str = "info") -> None:
+    """Append a small local activity record for the Bang TV Control Centre."""
+    try:
+        items = read_json_file(ACTIVITY_LOG_FILE, [])
+        if not isinstance(items, list):
+            items = []
+        items.insert(0, {"time": int(time.time()), "kind": kind, "message": str(message or "")})
+        write_json_file(ACTIVITY_LOG_FILE, items[:300])
+    except Exception as exc:
+        log(f"Activity log write failed: {exc}", xbmc.LOGWARNING)
+
+
+def add_bang_notification(message: str, kind: str = "Updates", level: str = "info") -> None:
+    """Store an in-add-on notification so updates are not missed."""
+    try:
+        items = read_json_file(NOTIFICATIONS_FILE, [])
+        if not isinstance(items, list):
+            items = []
+        items.insert(0, {"time": int(time.time()), "kind": kind, "level": level, "message": str(message or ""), "read": False})
+        write_json_file(NOTIFICATIONS_FILE, items[:200])
+        add_activity(message, kind)
+    except Exception as exc:
+        log(f"Notification write failed: {exc}", xbmc.LOGWARNING)
+
+
+def notifications_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Bang TV Notifications")
+    items = read_json_file(NOTIFICATIONS_FILE, [])
+    if not isinstance(items, list):
+        items = []
+    unread = sum(1 for i in items if isinstance(i, dict) and not i.get("read"))
+    add_action(f"Mark all read ({unread} unread)", "notifications_mark_read", plot="Marks all Bang TV notifications as read.")
+    add_action("Clear notifications", "notifications_clear", plot="Deletes the saved Bang TV notification inbox.")
+    add_action("Export notifications", "notifications_export", plot="Lets you choose a folder and export notifications as a text file.")
+    if not items:
+        add_action("No notifications yet", "tools")
+    for item in items[:100]:
+        if not isinstance(item, dict):
+            continue
+        prefix = "● " if not item.get("read") else "  "
+        kind = item.get("kind") or "Info"
+        label = f"{prefix}{nice_time(int(item.get('time', 0) or 0))} | {kind} | {item.get('message', '')}"
+        add_action(label, "notification_view", {"idx": str(items.index(item))}, plot=item.get("message") or "Bang TV notification")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def notification_view(idx: str) -> None:
+    items = read_json_file(NOTIFICATIONS_FILE, [])
+    try:
+        i = int(idx)
+        item = items[i]
+        if isinstance(item, dict):
+            item["read"] = True
+            write_json_file(NOTIFICATIONS_FILE, items)
+            xbmcgui.Dialog().textviewer("Bang TV Notification", f"{nice_time(int(item.get('time', 0) or 0))}\n{item.get('kind', 'Info')}\n\n{item.get('message', '')}")
+    except Exception:
+        notify("Notification not found", icon=xbmcgui.NOTIFICATION_WARNING)
+
+
+def notifications_mark_read() -> None:
+    items = read_json_file(NOTIFICATIONS_FILE, [])
+    if isinstance(items, list):
+        for item in items:
+            if isinstance(item, dict):
+                item["read"] = True
+        write_json_file(NOTIFICATIONS_FILE, items)
+    notify("Notifications marked read")
+
+
+def notifications_clear() -> None:
+    if xbmcgui.Dialog().yesno(ADDON_NAME, "Clear all Bang TV notifications?"):
+        write_json_file(NOTIFICATIONS_FILE, [])
+        add_activity("Notifications cleared", "Maintenance")
+        notify("Notifications cleared")
+
+
+def notifications_export() -> None:
+    folder = xbmcgui.Dialog().browse(3, "Choose export folder", "files")
+    if not folder:
+        return
+    folder = xbmcvfs.translatePath(folder)
+    path = os.path.join(folder, "BangTV_Notifications.txt")
+    items = read_json_file(NOTIFICATIONS_FILE, [])
+    lines = ["Bang TV Notifications", ""]
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, dict):
+            lines.append(f"{nice_time(int(item.get('time', 0) or 0))} | {item.get('kind', 'Info')} | {item.get('message', '')}")
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines))
+        notify("Notifications exported")
+    except Exception as exc:
+        notify("Export failed", icon=xbmcgui.NOTIFICATION_ERROR)
+        log(f"Notification export failed: {exc}", xbmc.LOGWARNING)
+
+
+def activity_log_menu() -> None:
+    items = read_json_file(ACTIVITY_LOG_FILE, [])
+    if not isinstance(items, list):
+        items = []
+    text = "Bang TV Activity Log\n\n"
+    if not items:
+        text += "No activity recorded yet."
+    for item in items[:200]:
+        if isinstance(item, dict):
+            text += f"{nice_time(int(item.get('time', 0) or 0))}\n{item.get('kind', 'Info')}: {item.get('message', '')}\n\n"
+    xbmcgui.Dialog().textviewer("Bang TV Activity Log", text)
+
+
+def bang_control_centre() -> None:
+    stats = live_stats_summary()
+    state = load_live_update_state()
+    health = stream_health_load()
+    notifications = read_json_file(NOTIFICATIONS_FILE, [])
+    unread = sum(1 for i in notifications if isinstance(i, dict) and not i.get("read")) if isinstance(notifications, list) else 0
+    ch = (state.get("last_result") or {}).get("channel_changes") if isinstance(state.get("last_result"), dict) else {}
+    failing = 0
+    slow = 0
+    for item in health.values() if isinstance(health, dict) else []:
+        if isinstance(item, dict):
+            fails = int(item.get("fails", 0) or 0)
+            if fails >= 3:
+                failing += 1
+            elif fails:
+                slow += 1
+    text = "Bang TV Control Centre\n\n"
+    text += f"Server: {SERVER}\n"
+    text += f"Last update: {nice_time(int(stats.get('newest_update', 0) or 0))}\n"
+    text += f"Next update: {nice_time(int(stats.get('next_check', 0) or 0)) if stats.get('next_check') else 'When Live TV is opened'}\n"
+    text += f"Categories: {stats.get('total_categories', 0)}\n"
+    text += f"Cached categories: {stats.get('cached_categories', 0)}\n"
+    text += f"Cached channels: {stats.get('total_channels', 0)}\n"
+    text += f"Cache health: {stats.get('status', 'Unknown')}\n"
+    text += f"Background updates: {'Enabled' if stats.get('background_enabled') else 'Disabled'}\n"
+    text += f"High Activity Mode: {'On' if stats.get('high_activity') else 'Off'}\n"
+    text += f"New channels last check: {int((ch or {}).get('added_count', 0) or 0)}\n"
+    text += f"Removed channels last check: {int((ch or {}).get('removed_count', 0) or 0)}\n"
+    text += f"Changed channels last check: {int((ch or {}).get('changed_count', 0) or 0)}\n"
+    text += f"Stream health records: {len(health) if isinstance(health, dict) else 0}\n"
+    text += f"Slow streams: {slow}\n"
+    text += f"Failing streams: {failing}\n"
+    text += f"Unread notifications: {unread}\n"
+    text += f"Recently watched: {len(recent_live_load())}\n"
+    text += f"Hidden categories: {len(hidden_live_load())}\n"
+    xbmcgui.Dialog().textviewer("Bang TV Control Centre", text)
+
+
+def live_tv_manager_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Live TV Manager")
+    add_action("Live TV Stats", "live_stats")
+    add_action("Refresh Live TV", "live_refresh")
+    add_action("Force Full Rebuild", "force_full_rebuild", plot="Clears Live TV cache then downloads a fresh playlist.")
+    add_action("Refresh EPG", "refresh_epg", plot="Clears EPG cache so guide info reloads fresh.")
+    add_folder("Manual EPG Manager", "manual_epg_manager", plot="Manually link any Live TV channel to an XMLTV EPG source and channel ID.")
+    add_action("Refresh Logos", "refresh_logos", plot="Clears old artwork and logo cache where possible.")
+    add_folder("Recently Updated Categories", "recently_changed", {"view": "categories"})
+    add_folder("Recently Added Channels", "recently_changed", {"view": "added"})
+    add_folder("Recently Removed Channels", "recently_changed", {"view": "removed"})
+    add_folder("Changed Channels", "recently_changed", {"view": "changed"})
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def force_full_rebuild() -> None:
+    if not xbmcgui.Dialog().yesno(ADDON_NAME, "Force a full Live TV rebuild now? This may take a moment."):
+        return
+    progress = xbmcgui.DialogProgress()
+    progress.create(ADDON_NAME, "Rebuilding Live TV cache...")
+    try:
+        cache = load_cache()
+        for key in list(cache.keys()):
+            if "get_live" in str(key) or "action=get_live" in str(key):
+                cache.pop(key, None)
+        save_cache(cache)
+        smart_live_check(force=True, show_notice=True, progress=progress)
+        add_bang_notification("Live TV full rebuild completed", "Maintenance")
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+
+
+def refresh_epg() -> None:
+    try:
+        cache = load_cache()
+        for key in list(cache.keys()):
+            if "epg" in str(key).lower() or "xmltv" in str(key).lower():
+                cache.pop(key, None)
+        save_cache(cache)
+        add_bang_notification("EPG cache refreshed", "Maintenance")
+        notify("EPG refresh complete")
+    except Exception as exc:
+        log(f"EPG refresh failed: {exc}", xbmc.LOGWARNING)
+        notify("EPG refresh failed", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def refresh_logos() -> None:
+    try:
+        # Plugin cannot reliably clear Kodi's global texture cache, so we clear Bang TV artwork metadata/cache only.
+        cache = load_cache()
+        for key in list(cache.keys()):
+            if "logo" in str(key).lower() or "art" in str(key).lower() or "image" in str(key).lower():
+                cache.pop(key, None)
+        save_cache(cache)
+        add_bang_notification("Logo and artwork cache refresh requested", "Maintenance")
+        notify("Logo refresh complete")
+    except Exception as exc:
+        log(f"Logo refresh failed: {exc}", xbmc.LOGWARNING)
+        notify("Logo refresh failed", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def recently_changed_menu(view: str = "categories") -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Recently Changed")
+    state = load_live_update_state()
+    result = state.get("last_result") if isinstance(state.get("last_result"), dict) else {}
+    changes = result.get("channel_changes") if isinstance(result.get("channel_changes"), dict) else {}
+    cat_ids = result.get("changed_category_ids") if isinstance(result.get("changed_category_ids"), list) else []
+    if view == "categories":
+        if not cat_ids:
+            add_action("No recently changed categories", "live_tv_manager")
+        for cid in cat_ids[:100]:
+            add_folder(f"Category ID {cid}", "live_streams", {"cat_id": str(cid), "page": "1"})
+    else:
+        ids = changes.get(view if view in {"added", "removed", "changed"} else "changed", [])
+        if not ids:
+            add_action("No items recorded from last check", "live_tv_manager")
+        for sid in ids[:200]:
+            add_action(f"Stream ID {sid}", "live_tv_manager")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def maintenance_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Maintenance")
+    add_action("Clean Cache", "auto_cleanup")
+    add_action("Clean Logos", "refresh_logos")
+    add_action("Clean Artwork", "refresh_logos")
+    add_action("Vacuum Databases", "vacuum_databases")
+    add_action("Remove Dead Cache", "auto_cleanup")
+    add_action("Weekly Auto Maintenance", "weekly_maintenance")
+    add_action("Reset Everything", "reset_everything", plot="Danger: clears user data, cache, stats, notifications and history.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def vacuum_databases() -> None:
+    ok = 0
+    for path in [METADATA_DB_FILE]:
+        try:
+            if os.path.exists(path):
+                con = sqlite3.connect(path)
+                con.execute("VACUUM")
+                con.close()
+                ok += 1
+        except Exception as exc:
+            log(f"Vacuum failed for {path}: {exc}", xbmc.LOGWARNING)
+    add_bang_notification(f"Database maintenance completed ({ok} database checked)", "Maintenance")
+    notify("Database maintenance complete")
+
+
+def weekly_maintenance() -> None:
+    live_auto_cleanup(False)
+    vacuum_databases()
+    add_bang_notification("Weekly auto maintenance completed", "Maintenance")
+    notify("Weekly maintenance complete")
+
+
+def reset_everything() -> None:
+    if not xbmcgui.Dialog().yesno(ADDON_NAME, "Reset Bang TV user data and cache? Login settings stay in Kodi settings, but favourites/history/cache/stats will be cleared."):
+        return
+    for path in [FAV_FILE, CACHE_FILE, BACKGROUND_QUEUE_FILE, STARTUP_PRELOAD_FILE, PLAY_LINKS_FILE, LIVE_UPDATE_STATE_FILE, RECENT_LIVE_FILE, HIDDEN_LIVE_CATEGORIES_FILE, STREAM_HEALTH_FILE, NOTIFICATIONS_FILE, ACTIVITY_LOG_FILE, STATISTICS_FILE]:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception as exc:
+            log(f"Reset could not remove {path}: {exc}", xbmc.LOGWARNING)
+    notify("Bang TV reset complete")
+
+
+def statistics_menu() -> None:
+    stats = live_stats_summary()
+    recent = recent_live_load()
+    cats = {}
+    for item in recent:
+        cid = str(item.get("category_id") or "Unknown") if isinstance(item, dict) else "Unknown"
+        cats[cid] = cats.get(cid, 0) + 1
+    text = "Bang TV Statistics\n\n"
+    text += f"Recently watched channels saved: {len(recent)}\n"
+    text += f"Total cached channels: {stats.get('total_channels', 0)}\n"
+    text += f"Total categories: {stats.get('total_categories', 0)}\n"
+    text += f"Cached categories: {stats.get('cached_categories', 0)}\n"
+    text += f"Most active saved category ID: {max(cats, key=cats.get) if cats else 'None'}\n"
+    text += f"Stream health records: {len(stream_health_load())}\n"
+    text += "\nMost recent channels:\n"
+    for item in recent[:20]:
+        if isinstance(item, dict):
+            text += f"{nice_time(int(item.get('time', 0) or 0))}: {item.get('name', 'Unknown')}\n"
+    xbmcgui.Dialog().textviewer("Bang TV Statistics", text)
+
+
+def stream_health_centre() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Stream Health Centre")
+    data = stream_health_load()
+    add_action("Reset Health Data", "reset_stream_health")
+    if not data:
+        add_action("No stream health data yet", "tools")
+    for sid, item in list(data.items())[:200]:
+        if not isinstance(item, dict):
+            continue
+        fails = int(item.get("fails", 0) or 0)
+        status = "🔴 Failing" if fails >= 3 else ("🟡 Slow" if fails else "🟢 Healthy")
+        label = f"{status} | Stream {sid} | fails {fails}"
+        plot = f"Last success: {nice_time(int(item.get('last_ok', 0) or 0))}\nLast failure: {nice_time(int(item.get('last_fail', 0) or 0))}\nReliability is based on local playback results."
+        add_action(label, "tools", plot=plot)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def reset_stream_health() -> None:
+    if xbmcgui.Dialog().yesno(ADDON_NAME, "Reset all stream health data?"):
+        write_json_file(STREAM_HEALTH_FILE, {})
+        add_bang_notification("Stream health data reset", "Maintenance")
+        notify("Stream health reset")
+
+
+def upcoming_sports_menu() -> None:
+    # Lightweight EPG keyword view using whatever guide metadata is already cached.
+    xbmcplugin.setPluginCategory(HANDLE, "Upcoming Sports")
+    keywords = ["rugby", "league", "cricket", "football", "soccer", "sport", "tennis", "basketball", "race", "ufc", "fight"]
+    found = 0
+    cache = load_cache()
+    for key, entry in cache.items():
+        if found >= 100:
+            break
+        if not isinstance(entry, dict):
+            continue
+        data = entry.get("data")
+        text = json.dumps(data, ensure_ascii=False).lower()[:20000]
+        if any(k in text for k in keywords):
+            add_action(f"Possible sport in cached guide: {str(key)[-60:]}", "tv_guide", plot="Open TV Guide to view cached programme information.")
+            found += 1
+    if not found:
+        add_action("No upcoming sports found in cached EPG yet", "tv_guide", plot="Open channels once EPG is loaded, then this page can find sports from cached guide data.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def backup_restore_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Backup & Restore")
+    add_action("Create Backup, choose save folder", "backup_choose")
+    add_action("Restore Backup, choose ZIP file", "restore_choose")
+    add_action("Create Quick Backup in Kodi profile", "backup_settings")
+    add_action("Restore Quick Backup from Kodi profile", "restore_settings")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def collect_backup_data() -> Dict[str, Any]:
+    return {
+        "created": int(time.time()),
+        "addon_version": ADDON_VERSION,
+        "favourites": fav_load(),
+        "recent_live": recent_live_load(),
+        "hidden_live_categories": hidden_live_load(),
+        "stream_health": stream_health_load(),
+        "live_update_state": load_live_update_state(),
+        "notifications": read_json_file(NOTIFICATIONS_FILE, []),
+        "activity_log": read_json_file(ACTIVITY_LOG_FILE, []),
+        "statistics": read_json_file(STATISTICS_FILE, {}),
+    }
+
+
+def backup_choose() -> None:
+    import zipfile
+    folder = xbmcgui.Dialog().browse(3, "Choose where to save Bang TV backup", "files")
+    if not folder:
+        return
+    folder = xbmcvfs.translatePath(folder)
+    name = datetime.now().strftime("BangTV_Backup_%Y-%m-%d_%H%M.zip")
+    path = os.path.join(folder, name)
+    tmp_json = os.path.join(PROFILE_PATH, "backup_payload.json")
+    try:
+        write_json_file(tmp_json, collect_backup_data())
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(tmp_json, "bangtv_backup.json")
+        try:
+            os.remove(tmp_json)
+        except Exception:
+            pass
+        add_bang_notification(f"Backup created: {path}", "Maintenance")
+        xbmcgui.Dialog().ok(ADDON_NAME, f"Backup saved to:\n{path}")
+    except Exception as exc:
+        log(f"Backup failed: {exc}", xbmc.LOGWARNING)
+        notify("Backup failed", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def restore_choose() -> None:
+    import zipfile
+    file_path = xbmcgui.Dialog().browse(1, "Choose Bang TV backup ZIP", "files", ".zip")
+    if not file_path:
+        return
+    file_path = xbmcvfs.translatePath(file_path)
+    try:
+        with zipfile.ZipFile(file_path, "r") as zf:
+            data = json.loads(zf.read("bangtv_backup.json").decode("utf-8"))
+        choices = ["Settings/state", "Favourites", "Recently watched", "Hidden categories", "Stream health", "Notifications", "Activity log", "Statistics"]
+        selected = xbmcgui.Dialog().multiselect("Choose what to restore", choices)
+        if selected is None:
+            return
+        if 1 in selected and isinstance(data.get("favourites"), list): fav_save(data.get("favourites"))
+        if 2 in selected and isinstance(data.get("recent_live"), list): write_json_file(RECENT_LIVE_FILE, data.get("recent_live"))
+        if 3 in selected and isinstance(data.get("hidden_live_categories"), dict): write_json_file(HIDDEN_LIVE_CATEGORIES_FILE, data.get("hidden_live_categories"))
+        if 4 in selected and isinstance(data.get("stream_health"), dict): write_json_file(STREAM_HEALTH_FILE, data.get("stream_health"))
+        if 5 in selected and isinstance(data.get("notifications"), list): write_json_file(NOTIFICATIONS_FILE, data.get("notifications"))
+        if 6 in selected and isinstance(data.get("activity_log"), list): write_json_file(ACTIVITY_LOG_FILE, data.get("activity_log"))
+        if 7 in selected and isinstance(data.get("statistics"), dict): write_json_file(STATISTICS_FILE, data.get("statistics"))
+        if 0 in selected and isinstance(data.get("live_update_state"), dict): save_live_update_state(data.get("live_update_state"))
+        add_bang_notification("Backup restored from selected ZIP", "Maintenance")
+        notify("Backup restored")
+    except Exception as exc:
+        log(f"Restore failed: {exc}", xbmc.LOGWARNING)
+        notify("Restore failed", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
+def advanced_settings_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Advanced Settings")
+    add_action("Open Kodi Add-on Settings", "open_settings")
+    add_action("Smart Live TV Updates Help", "live_help")
+    add_action("High Activity Mode Help", "live_help")
+    add_action("EPG / TV Guide Help", "live_help")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def help_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Help")
+    add_action("First Time Setup", "help_topic", {"topic": "setup"})
+    add_action("Live TV Updates", "live_help")
+    add_action("High Activity Mode", "live_help")
+    add_action("Stream Health", "help_topic", {"topic": "health"})
+    add_action("TV Guide", "help_topic", {"topic": "guide"})
+    add_action("FAQ", "help_topic", {"topic": "faq"})
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def help_topic(topic: str) -> None:
+    texts = {
+        "setup": "First Time Setup\n\nOpen Settings, enter your username and password, then use Test Connection. Open Live TV once to build the first cache.",
+        "health": "Stream Health\n\nBang TV records when streams play successfully or fail. This helps mark channels as healthy, slow, or failing.",
+        "guide": "TV Guide\n\nThe guide uses skin-safe Kodi lists for reliability. The experimental visual grid may not work on every skin, so the stable guide is the safest option.",
+        "faq": "FAQ\n\nIf Live TV feels slow, open the category once, then it should cache. Use Refresh Live TV for fresh data, or Update Category from a category context menu.",
+    }
+    xbmcgui.Dialog().textviewer("Bang TV Help", texts.get(topic, "Help not found."))
+
 def tools_menu() -> None:
     xbmcplugin.setPluginCategory(HANDLE, "Tools")
+    add_action("Bang TV Control Centre", "control_centre", plot="One screen showing server, cache, updates, health, notifications and activity status.")
+    add_folder("Bang TV Notifications", "notifications", plot="Inbox for Bang TV updates, warnings, maintenance and stream health messages.")
+    add_action("Activity Log", "activity_log", plot="Shows recent Bang TV background updates, cache changes and maintenance actions.")
+    add_folder("Live TV Manager", "live_tv_manager", plot="Live TV stats, refresh, EPG, logos and recently changed channel tools.")
+    add_folder("Manual EPG Manager", "manual_epg_manager", plot="Manually assign EPG data to channels when automatic matching does not work.")
+    add_folder("Maintenance", "maintenance", plot="Clean cache, logos, artwork, databases, dead cache and reset tools.")
+    add_action("Statistics", "statistics", plot="Viewing and cache statistics for Bang TV.")
+    add_folder("Stream Health Centre", "stream_health_centre", plot="Shows healthy, slow and failing streams based on local playback results.")
+    add_folder("Recently Changed", "recently_changed", {"view": "categories"}, plot="Recently updated categories from the last smart playlist check.")
+    add_folder("Upcoming Sports", "upcoming_sports", plot="Finds possible upcoming sport from cached EPG data.")
+    add_folder("Backup & Restore", "backup_restore", plot="Create or restore backups from a folder, USB, NAS or selected ZIP file.")
+    add_folder("Advanced Settings", "advanced_settings", plot="Smart update, cache, metadata and EPG settings/help.")
+    add_folder("Help", "help_menu", plot="First time setup, Live TV updates, High Activity Mode, Stream Health, TV Guide and FAQ.")
     add_action("Account status", "account_status", plot="Shows your IPTV account status, expiry date and connection limits.")
     add_action("Test connection", "connection_test", plot="Checks that Bang TV can connect to the Xtream Codes server with your saved login.")
-    add_action("Live TV Help", "live_help", plot="Explains Live TV cache, background updates, High Activity Mode, Refresh Live TV and Update Category.")
-    add_action("Server Dashboard", "live_dashboard", plot="Shows server, cache, update, change and High Activity Mode status.")
-    add_folder("Bang TV TV Guide", "tv_guide", plot="Opens the add-on TV Guide. This stays inside Bang TV and uses a grid-style Channel | Now | Next | Later layout.")
-    add_action("Auto cleanup now", "auto_cleanup", plot="Removes old cache records, old health records and trims recent channel history.")
-    add_action("Backup Bang TV settings", "backup_settings", plot="Backs up favourites, hidden categories, recent channels and Live TV update state.")
-    add_action("Restore Bang TV settings", "restore_settings", plot="Restores the saved Bang TV user backup if one exists.")
     add_folder("Cache", "cache_menu", plot="View cache size, clear cached metadata, clear EPG data, and rebuild Bang TV databases.")
-    add_action("Clear favourites", "clear_favourites", plot="Removes all saved Bang TV favourites. Your login and cache are not affected.")
     add_action("Settings", "open_settings", plot="Open Bang TV settings for login, metadata, preview and add-on options.")
     add_action("Logout", "logout", plot="Logs out of Bang TV and removes your saved IPTV username and password.")
     xbmcplugin.endOfDirectory(HANDLE)
-
 
 
 def live_update_help() -> None:
@@ -3770,6 +4757,89 @@ def router(paramstring: str) -> None:
         logout()
     elif mode == "tools":
         tools_menu()
+    elif mode == "control_centre":
+        bang_control_centre()
+    elif mode == "notifications":
+        notifications_menu()
+    elif mode == "notification_view":
+        notification_view(params.get("idx") or "0")
+    elif mode == "notifications_mark_read":
+        notifications_mark_read(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "notifications_clear":
+        notifications_clear(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "notifications_export":
+        notifications_export()
+    elif mode == "activity_log":
+        activity_log_menu()
+    elif mode == "live_tv_manager":
+        live_tv_manager_menu()
+    elif mode == "manual_epg_manager":
+        manual_epg_manager_menu()
+    elif mode == "manual_epg_sources":
+        manual_epg_sources_menu()
+    elif mode == "manual_epg_source_info":
+        manual_epg_source_info(params.get("source_id") or "")
+    elif mode == "manual_epg_refresh_sources":
+        manual_epg_refresh_sources(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "manual_epg_export":
+        manual_epg_export()
+    elif mode == "manual_epg_import":
+        manual_epg_import()
+    elif mode == "manual_epg_recent":
+        manual_epg_recent_menu()
+    elif mode == "manual_epg_unassigned":
+        manual_epg_unassigned_menu(False)
+    elif mode == "manual_epg_missing":
+        manual_epg_unassigned_menu(True)
+    elif mode == "manual_epg_assignments":
+        manual_epg_assignments_menu()
+    elif mode == "manual_epg_add_source":
+        manual_epg_add_source(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "manual_epg_assign":
+        manual_epg_assign(params.get("stream_id") or "", params.get("name") or "")
+    elif mode == "manual_epg_assign_prompt":
+        manual_epg_assign("", "")
+    elif mode == "manual_epg_clear_one":
+        manual_epg_clear_one(params.get("key") or "")
+    elif mode == "manual_epg_clear_all":
+        manual_epg_clear_all()
+
+    elif mode == "force_full_rebuild":
+        force_full_rebuild(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "refresh_epg":
+        refresh_epg(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "refresh_logos":
+        refresh_logos(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "recently_changed":
+        recently_changed_menu(params.get("view") or "categories")
+    elif mode == "maintenance":
+        maintenance_menu()
+    elif mode == "vacuum_databases":
+        vacuum_databases()
+    elif mode == "weekly_maintenance":
+        weekly_maintenance()
+    elif mode == "reset_everything":
+        reset_everything(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "statistics":
+        statistics_menu()
+    elif mode == "stream_health_centre":
+        stream_health_centre()
+    elif mode == "reset_stream_health":
+        reset_stream_health(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "upcoming_sports":
+        upcoming_sports_menu()
+    elif mode == "backup_restore":
+        backup_restore_menu()
+    elif mode == "backup_choose":
+        backup_choose()
+    elif mode == "restore_choose":
+        restore_choose(); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "advanced_settings":
+        advanced_settings_menu()
+    elif mode == "help_menu":
+        help_menu()
+    elif mode == "help_topic":
+        help_topic(params.get("topic") or "faq")
     elif mode == "cache_menu":
         cache_menu()
     elif mode == "live_help":

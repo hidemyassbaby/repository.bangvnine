@@ -1,3 +1,33 @@
+v1.0.26
+- Added built-in Sky GO NZ EPG source.
+- Added EPG Sources, Refresh EPG Sources, Channel Assignments, Unassigned Channels, Missing EPG, Recently Assigned Channels, Export EPG Mappings and Import EPG Mappings.
+- Manual EPG assignments override automatic matching and survive cache refreshes and backups.
+
+[1.0.25]
+- Added Manual EPG Manager.
+- Added context menu option to assign EPG to a Live TV channel.
+- Added custom XMLTV source support.
+- Added manual stream ID to XMLTV channel mapping.
+- Manual EPG mappings override automatic matching for Now/Next and guide rows.
+
+v1.0.24
+- Locked SkyGo XMLTV EPG feed to VIP | Sky Sport NZ category id 317.
+- Category 317 now uses https://raw.githubusercontent.com/matthuisman/i.mjh.nz/refs/heads/master/SkyGo/epg.xml for Now/Next and guide matching.
+- Kept name-based Sky Sport NZ matching as a backup if the server renames the category.
+
+v1.0.23
+- Added Sky Sport NZ EPG support for VIP | Sky Sport NZ channels.
+- Uses Matt Huisman SkyGo XMLTV feed when matching Sky Sport NZ live channels.
+- Added forgiving EPG name matching for VIP/NZ/HD/FHD channel name variations.
+- Sky Sport NZ channels can now show Now/Next and 7 day guide data where available.
+
+v1.0.22
+- Added Bang TV Control Centre.
+- Added Notifications inbox and Activity Log.
+- Added expanded Tools sections: Live TV Manager, Maintenance, Statistics, Stream Health Centre, Recently Changed, Upcoming Sports, Backup & Restore, Advanced Settings, Help.
+- Backup now supports choosing a save folder, including USB/NAS paths Kodi can browse.
+- Restore now supports choosing a backup ZIP and partial restore options.
+
 v1.0.21
 - Fixed TV Guide navigation items so they open on all skins.
 - TV Guide categories now use proper folder items instead of action items.
