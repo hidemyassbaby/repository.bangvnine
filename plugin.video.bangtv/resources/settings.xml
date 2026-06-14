@@ -12,6 +12,6 @@
     <setting id="show_epg" type="bool" label="Show live TV EPG from Xtream" default="true" />
     <setting id="live_smart_updates" type="bool" label="Smart Live TV background updates" default="true" />
     <setting id="live_cache_categories" type="bool" label="Cache channels inside Live TV categories" default="true" />
+    <setting id="live_startup_epg_boost" type="number" label="Live TV startup EPG boost count" default="4" visible="false" />
   </category>
-    <setting id="live_startup_epg_boost" type="integer" default="4" visible="false" />
 </settings>

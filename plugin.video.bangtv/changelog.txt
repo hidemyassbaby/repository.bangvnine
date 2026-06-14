@@ -1,3 +1,10 @@
+v1.0.54
+- Fixed startup crash caused by PAGE_SIZE being referenced before it was defined.
+- Fixed Kodi settings warning for live_startup_epg_boost by using a valid hidden numeric setting.
+- Improved first page Live TV EPG boost stability.
+- Kept fast cache-first browsing, Movies/TV metadata caching and background EPG loading.
+
+
 v1.0.53
 - Added SQLite cache for Movies and TV Shows category lists.
 - Added SQLite cache for Movies and TV Shows item lists so repeat opens are faster.
