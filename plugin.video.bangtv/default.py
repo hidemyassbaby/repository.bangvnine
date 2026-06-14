@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.25
+Version 1.0.35
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -13,6 +13,7 @@ import sys
 import time
 import sqlite3
 import urllib.parse
+from html import unescape as html_unescape
 import gzip
 import re
 import xml.etree.ElementTree as ET
@@ -39,12 +40,12 @@ TMDB_PROXY = "https://bangtvkodi.thomasnz.workers.dev"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/original"
 NZ_M3U_URL = "https://i.mjh.nz/nz/raw-tv.m3u8"
 DEFAULT_NZ_EPG_URL = "https://i.mjh.nz/nz/epg.xml.gz"
-SKYGO_EPG_URL = "https://raw.githubusercontent.com/matthuisman/i.mjh.nz/refs/heads/master/SkyGo/epg.xml"
+SKYGO_EPG_URL = "https://i.mjh.nz/SkyGo/epg.xml.gz"
 SKYGO_EPG_CATEGORY_IDS = {"317"}  # VIP | Sky Sport NZ
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.25",
+    "User-Agent": "Kodi BangTV/1.0.35",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -94,6 +95,32 @@ def log(message: str, level: int = xbmc.LOGINFO) -> None:
 
 def notify(message: str, title: str = ADDON_NAME, ms: int = 3000, icon: str = xbmcgui.NOTIFICATION_INFO) -> None:
     xbmcgui.Dialog().notification(title, message, icon, ms)
+
+
+def progress_create(progress: Any, heading: str, line1: str = "", line2: str = "") -> None:
+    message = "\n".join([x for x in [line1, line2] if x])
+    try:
+        progress.create(heading, message)
+    except TypeError:
+        try:
+            progress.create(heading)
+        except Exception:
+            pass
+    except Exception as exc:
+        log(f"Progress dialog create failed: {exc}", xbmc.LOGWARNING)
+
+
+def progress_update(progress: Any, percent: int, line1: str = "", line2: str = "") -> None:
+    message = "\n".join([x for x in [line1, line2] if x])
+    try:
+        progress.update(int(percent), message)
+    except TypeError:
+        try:
+            progress.update(int(percent))
+        except Exception:
+            pass
+    except Exception as exc:
+        log(f"Progress dialog update failed: {exc}", xbmc.LOGWARNING)
 
 
 def build_url(params: Dict[str, Any]) -> str:
@@ -198,10 +225,27 @@ def load_cache() -> Dict[str, Any]:
         if not os.path.exists(CACHE_FILE):
             return {}
         with open(CACHE_FILE, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
+            text = fh.read()
+        try:
+            data = json.loads(text)
+        except Exception as exc:
+            # Recover from older corrupted cache files that accidentally have extra JSON appended.
+            log(f"Cache read failed, attempting recovery: {exc}", xbmc.LOGWARNING)
+            decoder = json.JSONDecoder()
+            data, _idx = decoder.raw_decode(text.strip())
+            try:
+                save_cache(data if isinstance(data, dict) else {})
+            except Exception:
+                pass
         return data if isinstance(data, dict) else {}
     except Exception as exc:
         log(f"Cache read failed: {exc}", xbmc.LOGWARNING)
+        try:
+            bad_file = CACHE_FILE + ".bad"
+            if os.path.exists(CACHE_FILE):
+                os.replace(CACHE_FILE, bad_file)
+        except Exception:
+            pass
         return {}
 
 
@@ -1364,7 +1408,7 @@ def combined_epg_map_for_live_items(items: List[Dict[str, Any]], category_title:
                 merged = dict(epg_map)
                 merged.update(sky_map)
                 add_notification("Sky Sport NZ EPG available", "Sky GO NZ EPG feed is being used for VIP | Sky Sport NZ, category 317.", "updates")
-                activity_add("Sky Sport NZ EPG loaded from Sky GO NZ feed", "updates")
+                add_activity("Sky Sport NZ EPG loaded from Sky GO NZ feed", "updates")
                 return merged
     except Exception as exc:
         log(f"Sky Sport NZ EPG merge failed: {exc}", xbmc.LOGWARNING)
@@ -1676,6 +1720,8 @@ def safe_int(value: Any, default: int = 0) -> int:
 
 
 def set_art(li: xbmcgui.ListItem, thumb: str = "", fanart: str = "") -> None:
+    thumb = safe_image_url(thumb) if thumb else ""
+    fanart = safe_image_url(fanart) if fanart else ""
     art = {"icon": thumb or ADDON_ICON, "thumb": thumb or ADDON_ICON}
     if thumb:
         art.update({"poster": thumb})
@@ -1994,18 +2040,170 @@ def manual_epg_now_next(item: Dict[str, Any]) -> Dict[str, str]:
     return guide_now_next_text(programmes.get(channel_id, []) or {}) and {"plot": guide_now_next_text(programmes.get(channel_id, []) or [])} or {}
 
 
-def xmltv_channel_choices(url: str, cache_key: str) -> List[Tuple[str, str]]:
-    guide = xmltv_guide_data(url, cache_key)
-    channels = guide.get("channels") if isinstance(guide, dict) else {}
-    if not isinstance(channels, dict):
+def _epg_source_candidate_urls(url: str) -> List[str]:
+    urls = []
+    u = str(url or '').strip()
+    if u:
+        urls.append(u)
+    if 'githubusercontent.com/matthuisman/i.mjh.nz' in u and '/refs/heads/master/' in u:
+        urls.append(u.replace('/refs/heads/master/', '/master/'))
+    if 'SkyGo/epg.xml' in u or 'SkyGo/epg.xml.gz' in u:
+        urls.append('https://i.mjh.nz/SkyGo/epg.xml.gz')
+        urls.append('https://i.mjh.nz/SkyGo/epg.xml')
+        urls.append('https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master/SkyGo/epg.xml')
+    # preserve order but remove duplicates
+    out = []
+    for item in urls:
+        if item and item not in out:
+            out.append(item)
+    return out
+
+
+def _download_epg_source_bytes(url: str, progress: Any = None, force_refresh: bool = False) -> Tuple[bytes, str, str]:
+    """Download an XMLTV source for manual channel browsing.
+
+    This uses a direct requests call rather than the generic cache helper so the
+    EPG source picker can show visible progress and try known Sky GO mirrors.
+    Returns: bytes, used_url, error_text.
+    """
+    last_error = ''
+    for idx, candidate in enumerate(_epg_source_candidate_urls(url)):
+        if progress:
+            try:
+                progress.update(min(15 + idx * 15, 55), 'Downloading EPG source...', candidate[:90])
+            except Exception:
+                pass
+        try:
+            headers = {'User-Agent': 'Kodi BangTV EPG Manager/1.0'}
+            response = SESSION.get(candidate, timeout=75, headers=headers)
+            response.raise_for_status()
+            data = response.content or b''
+            if data:
+                return data, candidate, ''
+            last_error = 'Downloaded file was empty'
+        except requests.exceptions.Timeout:
+            last_error = 'Timed out downloading EPG source'
+            log(f'Manual EPG source timeout: {redact_url(candidate)}', xbmc.LOGWARNING)
+        except Exception as exc:
+            last_error = str(exc)
+            log(f'Manual EPG source download failed: {redact_url(candidate)} - {exc}', xbmc.LOGWARNING)
+    return b'', '', last_error or 'Could not download EPG source'
+
+
+def _parse_xmltv_channels_fast(raw: bytes, progress: Any = None) -> List[Tuple[str, str]]:
+    """Parse XMLTV <channel> blocks only.
+
+    XMLTV files can be very large because of programmes. For the manual picker
+    we only need the <channel> list, so this avoids loading the full guide.
+    """
+    if not raw:
         return []
+    try:
+        if raw[:2] == b'\x1f\x8b':
+            if progress:
+                progress.update(62, 'Decompressing EPG source...')
+            raw = gzip.decompress(raw)
+    except Exception as exc:
+        log(f'Manual EPG gzip decompress failed: {exc}', xbmc.LOGWARNING)
+    if progress:
+        progress.update(70, 'Reading EPG channel list...')
+    text = raw.decode('utf-8', 'ignore')
+    # Only scan the channel header area where possible. This is much faster on
+    # big 7-day feeds.
+    first_programme = text.find('<programme')
+    scan = text[:first_programme] if first_programme > 0 else text
     choices = []
-    for ch_id, names in channels.items():
-        display = (names[0] if names else ch_id) if isinstance(names, list) else ch_id
-        choices.append((str(ch_id), str(display)))
+    seen = set()
+    # Handles <channel id="..."><display-name>...</display-name></channel>
+    pattern = re.compile(r'<channel\b([^>]*)>(.*?)</channel\s*>', re.I | re.S)
+    for i, m in enumerate(pattern.finditer(scan)):
+        attrs = m.group(1) or ''
+        body = m.group(2) or ''
+        id_match = re.search(r'\bid\s*=\s*["\']([^"\']+)["\']', attrs, re.I)
+        if not id_match:
+            continue
+        ch_id = id_match.group(1).strip()
+        if not ch_id or ch_id in seen:
+            continue
+        names = []
+        for dn in re.finditer(r'<display-name\b[^>]*>(.*?)</display-name\s*>', body, re.I | re.S):
+            name = re.sub(r'<[^>]+>', '', dn.group(1) or '')
+            name = html_unescape(name).strip()
+            if name and name not in names:
+                names.append(name)
+        label = names[0] if names else ch_id
+        seen.add(ch_id)
+        choices.append((ch_id, label))
+        if progress and i and i % 50 == 0:
+            try:
+                progress.update(min(70 + int(len(choices) / 10), 92), f'Found {len(choices)} EPG channels...', label[:80])
+            except Exception:
+                pass
+    if choices:
+        choices.sort(key=lambda x: x[1].lower())
+        return choices
+    # Fallback to ElementTree if the regex missed namespaced or unusual XML.
+    try:
+        if progress:
+            progress.update(82, 'Using fallback XML parser...')
+        root = ET.fromstring(raw)
+        for channel in root.iter():
+            tag = str(channel.tag or '').split('}')[-1].lower()
+            if tag != 'channel':
+                continue
+            ch_id = str(channel.get('id') or '').strip()
+            if not ch_id or ch_id in seen:
+                continue
+            label = ch_id
+            for child in list(channel):
+                ctag = str(child.tag or '').split('}')[-1].lower()
+                if ctag == 'display-name' and (child.text or '').strip():
+                    label = (child.text or '').strip()
+                    break
+            seen.add(ch_id)
+            choices.append((ch_id, label))
+    except Exception as exc:
+        log(f'Manual EPG fallback XML parse failed: {exc}', xbmc.LOGWARNING)
     choices.sort(key=lambda x: x[1].lower())
     return choices
 
+
+def xmltv_channel_choices(url: str, cache_key: str, force_refresh: bool = False, progress: Any = None) -> List[Tuple[str, str]]:
+    """Return every XMLTV <channel> from an EPG source.
+
+    This ignores the normal EPG on/off setting. When you click Sky GO NZ under
+    EPG Sources, this function downloads/parses that XMLTV and returns every
+    channel in the EPG so you can pick one and assign it manually.
+    """
+    if not url:
+        return []
+    cache_id = 'xmltv_channels_' + re.sub(r'[^A-Za-z0-9_]+', '_', cache_key or str(abs(hash(url))))[:80]
+    if not force_refresh:
+        try:
+            cache = load_cache()
+            cached = cache.get('manual_epg_channels:' + cache_id)
+            if isinstance(cached, dict) and int(time.time()) - int(cached.get('time', 0)) < EPG_TTL_SECONDS:
+                data = cached.get('data')
+                if isinstance(data, list) and data:
+                    return [(str(a), str(b)) for a, b in data if a]
+        except Exception:
+            pass
+    raw, used_url, error = _download_epg_source_bytes(url, progress=progress, force_refresh=force_refresh)
+    if not raw:
+        log(f'Manual EPG channel list returned no data: {redact_url(url)} error={error}', xbmc.LOGWARNING)
+        return []
+    choices = _parse_xmltv_channels_fast(raw, progress=progress)
+    if choices:
+        metadata_cache_set('epg_source_channels', cache_id, {'items': choices, 'used_url': used_url})
+        # metadata_cache_set only stores dicts, so also keep old list cache via
+        # normal cache file for compatibility with previous versions.
+        try:
+            cache = load_cache()
+            cache['manual_epg_channels:' + cache_id] = {'time': int(time.time()), 'data': choices, 'used_url': used_url}
+            save_cache(cache)
+        except Exception:
+            pass
+    return choices
 
 def manual_epg_manager_menu() -> None:
     xbmcplugin.setPluginCategory(HANDLE, "EPG Manager")
@@ -2014,6 +2212,7 @@ def manual_epg_manager_menu() -> None:
     source_count = len([s for s in (data.get("sources") or {}).values() if isinstance(s, dict) and s.get("url")])
     add_folder(f"EPG Sources ({source_count})", "manual_epg_sources", plot="View built-in and custom XMLTV sources. Sky GO NZ is included by default.")
     add_action("Refresh EPG Sources", "manual_epg_refresh_sources", plot="Download and cache enabled EPG sources now.")
+    add_folder("Assign EPG by Live TV Category", "manual_epg_live_categories", plot="Choose a Live TV category, choose a Bang TV channel, then choose the matching EPG channel from Sky GO NZ or another XMLTV source.")
     add_action("Assign EPG by channel ID", "manual_epg_assign_prompt", plot="Enter a Live TV stream ID, choose an XMLTV source, then choose the matching EPG channel.")
     add_folder(f"Channel Assignments ({count})", "manual_epg_assignments", plot="View and clear manually assigned EPG channel mappings.")
     add_folder("Unassigned Channels", "manual_epg_unassigned", plot="Show cached Live TV channels that do not have a manual EPG assignment.")
@@ -2024,6 +2223,197 @@ def manual_epg_manager_menu() -> None:
     add_action("Import EPG Mappings", "manual_epg_import", plot="Choose a saved EPG mapping JSON file to restore.")
     add_action("Clear all manual EPG assignments", "manual_epg_clear_all", plot="Removes all manual EPG channel links. Does not delete normal EPG cache.")
     xbmcplugin.endOfDirectory(HANDLE)
+
+
+def cached_live_channel_choices(limit: int = 1000) -> List[Dict[str, Any]]:
+    """Return cached Live TV channels for EPG assignment pickers."""
+    seen: Dict[str, Dict[str, Any]] = {}
+    try:
+        for item in recent_live_load():
+            sid = str(item.get("stream_id") or item.get("live_id") or "")
+            if sid:
+                seen[sid] = {"stream_id": sid, "name": item.get("name") or sid, "thumb": item.get("thumb") or item.get("stream_icon") or ""}
+    except Exception:
+        pass
+    try:
+        cache = load_cache()
+        for val in cache.values() if isinstance(cache, dict) else []:
+            if isinstance(val, list):
+                for item in val:
+                    if not isinstance(item, dict):
+                        continue
+                    sid = str(item.get("stream_id") or item.get("live_id") or "")
+                    if sid:
+                        seen.setdefault(sid, item)
+    except Exception as exc:
+        log(f"Could not build cached Live TV channel picker: {exc}", xbmc.LOGWARNING)
+    items = sorted(seen.values(), key=lambda x: str(x.get("name") or x.get("stream_id") or "").lower())
+    return items[:limit]
+
+
+def _load_live_categories_for_epg_manager() -> List[Dict[str, Any]]:
+    url = xc_api_url("player_api.php?action=get_live_categories")
+    data = get_cached_json_any_age(url)
+    if data is None:
+        data = http_get_json_with_progress(url, "Loading Live TV categories...", timeout=25, force_refresh=False)
+    return data if isinstance(data, list) else []
+
+
+def _load_live_channels_for_epg_manager(cat_id: str, title: str = "") -> List[Dict[str, Any]]:
+    endpoint = f"player_api.php?action=get_live_streams&category_id={quote(cat_id)}" if cat_id else "player_api.php?action=get_live_streams"
+    url = xc_api_url(endpoint)
+    data = get_cached_json_any_age(url)
+    if data is None:
+        data = http_get_json_with_progress(url, f"Loading channels for {title or 'category'}...", timeout=30, force_refresh=False)
+    return data if isinstance(data, list) else []
+
+
+def manual_epg_live_categories_menu() -> None:
+    xbmcplugin.setPluginCategory(HANDLE, "Assign EPG by Category")
+    xbmcplugin.setContent(HANDLE, "videos")
+    cats = _load_live_categories_for_epg_manager()
+    if not cats:
+        add_action("No Live TV categories found. Open Live TV first, then try again.", "manual_epg_manager")
+    else:
+        add_folder("All Live TV Channels", "manual_epg_live_channels", {"cat_id": "", "title": "All Live TV Channels"}, plot="Show all cached/live channels, then choose one to map to an EPG channel.")
+        for cat in sorted_items(cats, "category_name"):
+            cid = str(cat.get("category_id") or "")
+            name = str(cat.get("category_name") or "Unknown")
+            if cid and not hidden_live_is_hidden(cid):
+                add_folder(name, "manual_epg_live_channels", {"cat_id": cid, "title": name}, plot="Open this category, choose a Bang TV channel, then select the EPG channel to assign.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_live_channels_menu(cat_id: str, title: str = "") -> None:
+    title = title or "Live TV Channels"
+    xbmcplugin.setPluginCategory(HANDLE, f"Assign EPG: {title}")
+    xbmcplugin.setContent(HANDLE, "videos")
+    channels = _load_live_channels_for_epg_manager(cat_id, title)
+    if not channels:
+        add_action("No channels found in this category", "manual_epg_live_categories", plot="Open Live TV first or refresh this category, then try again.")
+    else:
+        for item in sorted_items(channels, "name")[:3000]:
+            sid = str(item.get("stream_id") or item.get("live_id") or "")
+            name = str(item.get("name") or sid or "Live TV Channel")
+            icon = str(item.get("stream_icon") or item.get("thumbnail") or "")
+            if not sid:
+                continue
+            current = get_manual_epg_assignment({"stream_id": sid, "name": name})
+            suffix = ""
+            plot = "Choose this Bang TV channel, then choose the EPG source and EPG channel to link to it."
+            if current:
+                suffix = "  [EPG linked]"
+                plot += f"\n\nCurrent EPG: {current.get('source_label') or current.get('source_id')} → {current.get('channel_label') or current.get('channel_id')}"
+            add_folder(name + suffix, "manual_epg_sources_for_channel", {"stream_id": sid, "name": name, "cat_id": cat_id, "title": title}, thumb=icon, plot=plot)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_sources_for_channel_menu(stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    xbmcplugin.setPluginCategory(HANDLE, f"EPG Source for {name}")
+    xbmcplugin.setContent(HANDLE, "videos")
+    data = manual_epg_load()
+    sources = data.get("sources") or {}
+    add_action("Automatic EPG", "manual_epg_clear_channel", {"stream_id": stream_id, "name": name}, plot="Remove manual override and use automatic EPG matching.")
+    for sid, src in sorted(sources.items(), key=lambda kv: str((kv[1] or {}).get("label") or kv[0]).lower()):
+        if not isinstance(src, dict):
+            continue
+        label = str(src.get("label") or sid)
+        url = str(src.get("url") or "")
+        if not url:
+            continue
+        plot = f"Open {label}, load its XMLTV channels with a progress dialog, then choose the EPG channel to assign to {name}.\n\nURL: {url}"
+        add_folder(f"{'⭐ ' if sid == 'skygo' else ''}{label}", "manual_epg_source_channels_for_channel", {"source_id": sid, "stream_id": stream_id, "name": name, "cat_id": cat_id, "title": title}, plot=plot)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_source_channels_for_channel_menu(source_id: str, stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id)
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    xbmcplugin.setPluginCategory(HANDLE, f"{label} EPG Channels")
+    xbmcplugin.setContent(HANDLE, "videos")
+    if not url:
+        add_action("EPG source has no URL", "manual_epg_sources_for_channel", {"stream_id": stream_id, "name": name})
+        xbmcplugin.endOfDirectory(HANDLE)
+        return
+    progress = xbmcgui.DialogProgress()
+    progress_create(progress, ADDON_NAME, f"Loading {label} EPG channels...", "Downloading XMLTV data")
+    try:
+        choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=True, progress=progress)
+        try:
+            progress_update(progress, 100, "EPG channels loaded", f"Found {len(choices)} channels")
+        except Exception:
+            pass
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    add_action(f"Loaded EPG channels: {len(choices)}", "manual_epg_source_info", {"source_id": source_id}, plot=f"Source: {label}\nURL: {url}")
+    if not choices:
+        add_action("No EPG channels found. Check the EPG URL or try Refresh EPG Sources.", "manual_epg_manager")
+    else:
+        target = norm_epg_key(name)
+        def score(pair):
+            cid, lbl = pair
+            key = norm_epg_key(lbl)
+            if target and key == target:
+                return (0, lbl.lower())
+            if target and (target in key or key in target):
+                return (1, lbl.lower())
+            return (2, lbl.lower())
+        for ch_id, ch_label in sorted(choices, key=score)[:3000]:
+            plot = f"Assign EPG channel:\n{ch_label}\n\nEPG ID: {ch_id}\n\nTo Bang TV channel:\n{name}"
+            add_action(str(ch_label), "manual_epg_assign_to_stream", {"source_id": source_id, "channel_id": ch_id, "channel_label": ch_label, "stream_id": stream_id, "name": name, "cat_id": cat_id, "title": title}, plot=plot)
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_assign_to_stream(source_id: str, channel_id: str, channel_label: str, stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    source_id = str(source_id or "")
+    channel_id = str(channel_id or "")
+    channel_label = str(channel_label or channel_id)
+    stream_id = str(stream_id or "")
+    name = str(name or stream_id or "Live TV Channel")
+    if not stream_id or not channel_id:
+        notify("Missing channel or EPG ID", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    source_label = str(src.get("label") or source_id)
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    key = manual_epg_channel_key(stream_id, name)
+    data.setdefault("channels", {})[key] = {
+        "stream_id": stream_id,
+        "name": name,
+        "source_id": source_id,
+        "source_label": source_label,
+        "url": url,
+        "channel_id": channel_id,
+        "channel_label": channel_label,
+        "updated": int(time.time()),
+    }
+    manual_epg_save(data)
+    add_bang_notification(f"Manual EPG assigned: {name} → {channel_label}", "Updates")
+    add_activity(f"Manual EPG assigned for {name}", "updates")
+    xbmcgui.Dialog().ok(ADDON_NAME, f"EPG assigned\n\n{name}\n→ {channel_label}")
+    xbmc.executebuiltin("Container.Refresh")
+
+
+def manual_epg_clear_channel(stream_id: str, name: str = "") -> None:
+    data = manual_epg_load()
+    key = manual_epg_channel_key(stream_id, name)
+    removed = False
+    if key in (data.get("channels") or {}):
+        data["channels"].pop(key, None)
+        removed = True
+    name_key = manual_epg_channel_key("", name)
+    if name_key in (data.get("channels") or {}):
+        data["channels"].pop(name_key, None)
+        removed = True
+    manual_epg_save(data)
+    notify("Manual EPG cleared" if removed else "No manual EPG override found")
+    xbmc.executebuiltin("Container.Refresh")
 
 
 def manual_epg_sources_menu() -> None:
@@ -2040,8 +2430,8 @@ def manual_epg_sources_menu() -> None:
         enabled = bool(src.get("enabled", True))
         built = "Built-in" if src.get("builtin") else "Custom"
         status = "Enabled" if enabled else "Disabled"
-        plot = f"{built} EPG source\nStatus: {status}\nURL: {url}\n\nUse this source when assigning EPG to a channel."
-        add_action(f"{'⭐ ' if sid == 'skygo' else ''}{label} [{status}]", "manual_epg_source_info", {"source_id": sid}, plot=plot)
+        plot = f"{built} EPG source\nStatus: {status}\nURL: {url}\n\nOpen this source to load its XMLTV channels, then pick one and assign it to a Bang TV channel."
+        add_folder(f"{'⭐ ' if sid == 'skygo' else ''}{label} [{status}]", "manual_epg_source_channels", {"source_id": sid}, plot=plot)
     add_action("Add Custom XMLTV Source URL", "manual_epg_add_source")
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -2053,8 +2443,107 @@ def manual_epg_source_info(source_id: str) -> None:
     url = str(src.get("url") or "")
     guide = xmltv_guide_data(url, "source_info_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80]) if url else {}
     channels = guide.get("channels") if isinstance(guide, dict) else {}
-    text = f"{label}\n\nURL:\n{url}\n\nStatus: {'Enabled' if src.get('enabled', True) else 'Disabled'}\nType: {'Built-in' if src.get('builtin') else 'Custom'}\nChannel count: {len(channels) if isinstance(channels, dict) else 0}\n\nThis source can be selected from a channel context menu using Assign EPG."
+    text = f"{label}\n\nURL:\n{url}\n\nStatus: {'Enabled' if src.get('enabled', True) else 'Disabled'}\nType: {'Built-in' if src.get('builtin') else 'Custom'}\nChannel count: {len(channels) if isinstance(channels, dict) else 0}\n\nOpen this source to view all EPG channels and assign one to a Bang TV Live TV channel."
     xbmcgui.Dialog().textviewer("EPG Source", text)
+
+
+def manual_epg_source_channels_menu(source_id: str) -> None:
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id)
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    xbmcplugin.setPluginCategory(HANDLE, f"{label} EPG Channels")
+    if not url:
+        add_action("EPG source has no URL", "manual_epg_sources")
+        xbmcplugin.endOfDirectory(HANDLE)
+        return
+    progress = xbmcgui.DialogProgress()
+    progress_create(progress, ADDON_NAME, "Loading EPG channels...", label)
+    try:
+        choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=True, progress=progress)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    add_action("Source info", "manual_epg_source_info", {"source_id": source_id}, plot=f"View URL and channel count for {label}.")
+    add_action("Refresh this EPG source", "manual_epg_refresh_one_source", {"source_id": source_id}, plot="Force refresh this XMLTV feed now.")
+    if choices:
+        add_action(f"EPG channels loaded: {len(choices)}", "manual_epg_source_info", {"source_id": source_id}, plot="This source loaded successfully. Choose any EPG channel below to assign it to a Bang TV channel.")
+    if not choices:
+        add_action("No EPG channels found. Press Refresh this EPG source, or check the URL.", "manual_epg_sources")
+    else:
+        for ch_id, ch_label in choices[:2000]:
+            add_action(str(ch_label), "manual_epg_assign_from_source_channel", {"source_id": source_id, "channel_id": ch_id, "channel_label": ch_label}, plot=f"EPG channel ID: {ch_id}\nSelect this, then choose the Bang TV channel to link it to.")
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
+def manual_epg_refresh_one_source(source_id: str) -> None:
+    url = manual_epg_source_url(source_id)
+    if not url:
+        notify("No EPG source URL", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    progress = xbmcgui.DialogProgress()
+    progress_create(progress, ADDON_NAME, "Refreshing EPG source...", source_id)
+    try:
+        xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=True, progress=progress)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    notify("EPG source refreshed")
+    add_bang_notification(f"EPG source refreshed: {source_id}", "Updates")
+
+
+def manual_epg_assign_from_source_channel(source_id: str, channel_id: str, channel_label: str) -> None:
+    source_id = str(source_id or "")
+    channel_id = str(channel_id or "")
+    channel_label = str(channel_label or channel_id)
+    url = manual_epg_source_url(source_id)
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    source_label = str(src.get("label") or ("Provider XMLTV" if source_id == "xtream" else source_id))
+    live_items = cached_live_channel_choices()
+    if not live_items:
+        notify("No cached Live TV channels yet", icon=xbmcgui.NOTIFICATION_ERROR)
+        xbmcgui.Dialog().ok(ADDON_NAME, "Open Live TV first so Bang TV can cache your channels, then come back and assign the EPG channel.")
+        return
+    names = []
+    default_idx = 0
+    target = norm_epg_key(channel_label)
+    for i, item in enumerate(live_items):
+        nm = str(item.get("name") or item.get("stream_id") or "Live TV Channel")
+        names.append(nm)
+        nkey = norm_epg_key(nm)
+        if target and (target in nkey or nkey in target) and default_idx == 0:
+            default_idx = i
+    idx = xbmcgui.Dialog().select(f"Assign '{channel_label}' to Bang TV channel", names, preselect=default_idx)
+    if idx < 0:
+        notify("EPG assignment cancelled")
+        return
+    item = live_items[idx]
+    sid = str(item.get("stream_id") or item.get("live_id") or "")
+    channel_name = str(item.get("name") or sid)
+    if not sid:
+        notify("Selected Bang TV channel has no stream ID", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    key = manual_epg_channel_key(sid, channel_name)
+    data.setdefault("channels", {})[key] = {
+        "stream_id": sid,
+        "name": channel_name,
+        "source_id": source_id,
+        "source_label": source_label,
+        "url": url,
+        "channel_id": channel_id,
+        "channel_label": channel_label,
+        "updated": int(time.time()),
+    }
+    manual_epg_save(data)
+    add_bang_notification(f"Manual EPG assigned: {channel_name} → {channel_label}", "Updates")
+    add_activity(f"Manual EPG assigned for {channel_name}", "updates")
+    notify(f"EPG linked to {channel_name}")
+    xbmc.executebuiltin("Container.Refresh")
 
 
 def manual_epg_refresh_sources() -> None:
@@ -2080,7 +2569,7 @@ def manual_epg_refresh_sources() -> None:
         except Exception:
             pass
     add_bang_notification(f"EPG sources refreshed: {refreshed}", "Updates")
-    activity_add(f"EPG sources refreshed: {refreshed}", "updates")
+    add_activity(f"EPG sources refreshed: {refreshed}", "updates")
     notify(f"EPG sources refreshed: {refreshed}")
 
 
@@ -2191,14 +2680,23 @@ def manual_epg_add_source() -> None:
 
 def manual_epg_source_select() -> Tuple[str, str, str]:
     data = manual_epg_load()
-    options = [("xtream", "Provider XMLTV", xtream_xmltv_url()), ("skygo", "Sky GO NZ", SKYGO_EPG_URL)]
+    options: List[Tuple[str, str, str]] = []
+    provider_url = xtream_xmltv_url()
+    if provider_url:
+        options.append(("xtream", "Provider XMLTV", provider_url))
+    seen = set(["xtream"])
     for sid, src in (data.get("sources") or {}).items():
-        if isinstance(src, dict):
-            options.append((str(sid), str(src.get("label") or sid), str(src.get("url") or "")))
-    labels = [o[1] for o in options if o[2]]
+        if not isinstance(src, dict):
+            continue
+        url = str(src.get("url") or "")
+        if not url or sid in seen:
+            continue
+        seen.add(str(sid))
+        options.append((str(sid), str(src.get("label") or sid), url))
     filtered = [o for o in options if o[2]]
     if not filtered:
         return "", "", ""
+    labels = [o[1] for o in filtered]
     idx = xbmcgui.Dialog().select("Choose EPG source", labels)
     if idx < 0:
         return "", "", ""
@@ -2218,7 +2716,7 @@ def manual_epg_assign(stream_id: str = "", name: str = "") -> None:
         notify("EPG assignment cancelled")
         return
     progress = xbmcgui.DialogProgress()
-    progress.create(ADDON_NAME, "Loading EPG channels...", source_label)
+    progress_create(progress, ADDON_NAME, "Loading EPG channels...", source_label)
     try:
         choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80])
     finally:
@@ -2256,7 +2754,7 @@ def manual_epg_assign(stream_id: str = "", name: str = "") -> None:
     }
     manual_epg_save(data)
     add_bang_notification(f"Manual EPG assigned: {channel_name} → {ch_label}", "Updates")
-    activity_add(f"Manual EPG assigned for {channel_name}", "updates")
+    add_activity(f"Manual EPG assigned for {channel_name}", "updates")
     notify("Manual EPG assigned")
     xbmc.executebuiltin("Container.Refresh")
 
@@ -2450,6 +2948,9 @@ def backup_settings() -> None:
         "notifications": read_json_file(NOTIFICATIONS_FILE, []),
         "activity_log": read_json_file(ACTIVITY_LOG_FILE, []),
         "statistics": read_json_file(STATISTICS_FILE, {}),
+        "manual_epg": manual_epg_load(),
+        "manual_epg_sources": (manual_epg_load().get("sources") or {}),
+        "manual_epg_channels": (manual_epg_load().get("channels") or {}),
     }
     write_json_file(BACKUP_FILE, data)
     xbmcgui.Dialog().ok(ADDON_NAME, f"Backup saved to:\n{BACKUP_FILE}")
@@ -2843,7 +3344,7 @@ def add_playable(name: str, play_url: str, thumb: str = "", plot: str = "", year
     context_items = []
     if live_stream_id:
         context_items.append((f"Stream health: {stream_health_status(live_stream_id)}", f'Notification({ADDON_NAME},Stream health: {stream_health_status(live_stream_id)},2500)'))
-        context_items.append(("Assign EPG to this channel", f'RunPlugin({build_url({"mode": "manual_epg_assign", "stream_id": str(live_stream_id), "name": name})})'))
+        context_items.append(("Assign EPG to this channel", f'RunPlugin({build_url({"mode": "manual_epg_assign", "stream_id": str(live_stream_id), "name": name, "cat_id": live_category_id or ""})})'))
     if play_url:
         if fav_is_saved(play_url):
             context_items.append(("Remove from Bang TV favourites", f'RunPlugin({build_url({"mode": "fav_remove_token", "id": token})})'))
@@ -4581,7 +5082,7 @@ def restore_choose() -> None:
     try:
         with zipfile.ZipFile(file_path, "r") as zf:
             data = json.loads(zf.read("bangtv_backup.json").decode("utf-8"))
-        choices = ["Settings/state", "Favourites", "Recently watched", "Hidden categories", "Stream health", "Notifications", "Activity log", "Statistics"]
+        choices = ["Settings/state", "Favourites", "Recently watched", "Hidden categories", "Stream health", "Notifications", "Activity log", "Statistics", "Custom EPG sources and mappings"]
         selected = xbmcgui.Dialog().multiselect("Choose what to restore", choices)
         if selected is None:
             return
@@ -4592,6 +5093,15 @@ def restore_choose() -> None:
         if 5 in selected and isinstance(data.get("notifications"), list): write_json_file(NOTIFICATIONS_FILE, data.get("notifications"))
         if 6 in selected and isinstance(data.get("activity_log"), list): write_json_file(ACTIVITY_LOG_FILE, data.get("activity_log"))
         if 7 in selected and isinstance(data.get("statistics"), dict): write_json_file(STATISTICS_FILE, data.get("statistics"))
+        if 8 in selected:
+            epg_data = data.get("manual_epg") if isinstance(data.get("manual_epg"), dict) else {}
+            if not epg_data:
+                epg_data = {"sources": data.get("manual_epg_sources") or {}, "channels": data.get("manual_epg_channels") or {}}
+            if isinstance(epg_data, dict):
+                current = manual_epg_load()
+                current.setdefault("sources", {}).update(epg_data.get("sources") or {})
+                current.setdefault("channels", {}).update(epg_data.get("channels") or {})
+                manual_epg_save(ensure_builtin_epg_sources(current))
         if 0 in selected and isinstance(data.get("live_update_state"), dict): save_live_update_state(data.get("live_update_state"))
         add_bang_notification("Backup restored from selected ZIP", "Maintenance")
         notify("Backup restored")
@@ -4744,6 +5254,1224 @@ def main_menu() -> None:
     xbmcplugin.endOfDirectory(HANDLE)
 
 
+
+
+# ---- v1.0.32 robust EPG source browser overrides ----
+def _btv_decompress_xmltv_bytes(raw: bytes, progress: Any = None) -> bytes:
+    """Return plain XML bytes from XMLTV or XMLTV.GZ without throwing."""
+    try:
+        if not raw:
+            return b""
+        # Requests may already decompress some responses. Only decompress true gzip bytes.
+        if raw[:2] == b"\x1f\x8b":
+            if progress:
+                try:
+                    progress.update(45, "Decompressing Sky GO NZ EPG...")
+                except Exception:
+                    pass
+            try:
+                return gzip.decompress(raw)
+            except Exception:
+                import io
+                with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
+                    return gz.read()
+        return raw
+    except Exception as exc:
+        log(f"EPG gzip/XML decompress failed: {exc}", xbmc.LOGWARNING)
+        return raw or b""
+
+
+def _btv_download_xmltv_source(url: str, progress: Any = None) -> Tuple[bytes, str, str]:
+    """Download XMLTV source with visible progress and no hard crash."""
+    last_error = ""
+    for idx, candidate in enumerate(_epg_source_candidate_urls(url)):
+        try:
+            if progress:
+                try:
+                    progress.update(min(10 + idx * 15, 40), "Downloading EPG source...", candidate[:100])
+                except Exception:
+                    pass
+            headers = {
+                "User-Agent": "Kodi BangTV/1.0.35",
+                "Accept": "application/xml,text/xml,*/*",
+            }
+            response = SESSION.get(candidate, timeout=90, headers=headers)
+            response.raise_for_status()
+            raw = response.content or b""
+            if raw:
+                return _btv_decompress_xmltv_bytes(raw, progress), candidate, ""
+            last_error = "Downloaded EPG file was empty"
+        except Exception as exc:
+            last_error = str(exc)
+            log(f"EPG source download failed: {redact_url(candidate)} - {exc}", xbmc.LOGWARNING)
+    return b"", "", last_error or "Could not download EPG source"
+
+
+def _btv_parse_xmltv_channel_rows(raw: bytes, progress: Any = None) -> List[Tuple[str, str]]:
+    """Extract all XMLTV <channel> ids and display names without loading programmes."""
+    try:
+        if not raw:
+            return []
+        if progress:
+            try:
+                progress.update(65, "Reading EPG channels...")
+            except Exception:
+                pass
+        text = raw.decode("utf-8", "ignore")
+        # Channel definitions normally live before the first programme. This keeps it quick.
+        first_programme = text.find("<programme")
+        scan = text[:first_programme] if first_programme > 0 else text
+        choices: List[Tuple[str, str]] = []
+        seen = set()
+        for idx, m in enumerate(re.finditer(r"<channel\b([^>]*)>(.*?)</channel\s*>", scan, re.I | re.S)):
+            attrs = m.group(1) or ""
+            body = m.group(2) or ""
+            id_match = re.search(r"\bid\s*=\s*[\"']([^\"']+)[\"']", attrs, re.I)
+            if not id_match:
+                continue
+            ch_id = html_unescape(id_match.group(1)).strip()
+            if not ch_id or ch_id in seen:
+                continue
+            names = []
+            for dn in re.finditer(r"<display-name\b[^>]*>(.*?)</display-name\s*>", body, re.I | re.S):
+                name = re.sub(r"<[^>]+>", "", dn.group(1) or "")
+                name = html_unescape(name).strip()
+                if name and name not in names:
+                    names.append(name)
+            label = names[0] if names else ch_id
+            seen.add(ch_id)
+            choices.append((ch_id, label))
+            if progress and idx and idx % 25 == 0:
+                try:
+                    progress.update(min(70 + int(len(choices) / 3), 94), f"Found {len(choices)} EPG channels...", label[:90])
+                except Exception:
+                    pass
+        if choices:
+            choices.sort(key=lambda row: row[1].lower())
+            return choices
+        # Fallback parser for unusual XML formatting.
+        try:
+            import io
+            if progress:
+                try:
+                    progress.update(80, "Using fallback XML parser...")
+                except Exception:
+                    pass
+            root = ET.fromstring(raw)
+            for channel in root.iter():
+                tag = str(channel.tag or "").split("}")[-1].lower()
+                if tag != "channel":
+                    continue
+                ch_id = str(channel.get("id") or "").strip()
+                if not ch_id or ch_id in seen:
+                    continue
+                label = ch_id
+                for child in list(channel):
+                    ctag = str(child.tag or "").split("}")[-1].lower()
+                    if ctag == "display-name" and (child.text or "").strip():
+                        label = (child.text or "").strip()
+                        break
+                seen.add(ch_id)
+                choices.append((ch_id, label))
+        except Exception as exc:
+            log(f"Fallback XMLTV channel parse failed: {exc}", xbmc.LOGWARNING)
+        choices.sort(key=lambda row: row[1].lower())
+        return choices
+    except Exception as exc:
+        log(f"XMLTV channel list parse crashed: {exc}", xbmc.LOGERROR)
+        return []
+
+
+def xmltv_channel_choices(url: str, cache_key: str, force_refresh: bool = False, progress: Any = None) -> List[Tuple[str, str]]:
+    """Robust channel list loader for EPG Sources. Ignores global EPG on/off."""
+    try:
+        if not url:
+            return []
+        cache_id = "xmltv_channels_" + re.sub(r"[^A-Za-z0-9_]+", "_", cache_key or str(abs(hash(url))))[:80]
+        if not force_refresh:
+            cached = metadata_cache_get("epg_source_channels", cache_id, ttl=EPG_TTL_SECONDS)
+            if isinstance(cached, dict):
+                items = cached.get("items")
+                if isinstance(items, list) and items:
+                    return [(str(a), str(b)) for a, b in items if a]
+        raw, used_url, error = _btv_download_xmltv_source(url, progress)
+        if not raw:
+            log(f"No XMLTV data returned for {redact_url(url)} error={error}", xbmc.LOGWARNING)
+            return []
+        choices = _btv_parse_xmltv_channel_rows(raw, progress)
+        if choices:
+            metadata_cache_set("epg_source_channels", cache_id, {"items": choices, "used_url": used_url, "updated": int(time.time())})
+        else:
+            log(f"XMLTV source loaded but no <channel> rows found: {redact_url(used_url or url)}", xbmc.LOGWARNING)
+        return choices
+    except Exception as exc:
+        log(f"xmltv_channel_choices crashed: {exc}", xbmc.LOGERROR)
+        return []
+
+
+def manual_epg_source_channels_menu(source_id: str) -> None:
+    """Open an EPG source, show visible loading, then list every EPG channel."""
+    xbmcplugin.setPluginCategory(HANDLE, "Sky GO NZ EPG Channels" if source_id == "skygo" else "EPG Channels")
+    xbmcplugin.setContent(HANDLE, "videos")
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id or "EPG Source")
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    if not url:
+        add_action("EPG source has no URL", "manual_epg_sources")
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+        return
+    choices: List[Tuple[str, str]] = []
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress_create(progress, ADDON_NAME, f"Loading {label} EPG", "Downloading guide...")
+        choices = xmltv_channel_choices(url, "manual_source_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id or label)[:80], force_refresh=True, progress=progress)
+        try:
+            progress_update(progress, 100, "EPG loaded", f"Found {len(choices)} channels")
+        except Exception:
+            pass
+    except Exception as exc:
+        log(f"EPG source channel menu crashed: {exc}", xbmc.LOGERROR)
+        try:
+            progress_update(progress, 100, "EPG load failed", str(exc)[:90])
+            xbmc.sleep(700)
+        except Exception:
+            pass
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    add_action(f"Source info: {label}", "manual_epg_source_info", {"source_id": source_id}, plot=f"URL: {url}\nChannels found: {len(choices)}")
+    add_action("Refresh this EPG source", "manual_epg_refresh_one_source", {"source_id": source_id}, plot="Force download and parse this XMLTV source again.")
+    if not choices:
+        add_action("No EPG channels found", "manual_epg_sources", plot=f"Bang TV downloaded the EPG source but could not read channel rows.\n\nSource: {label}\nURL: {url}")
+    else:
+        add_action(f"EPG channels loaded: {len(choices)}", "manual_epg_source_info", {"source_id": source_id}, plot="Choose an EPG channel below, then choose the Bang TV channel to assign it to.")
+        for ch_id, ch_label in choices[:3000]:
+            add_action(str(ch_label), "manual_epg_assign_from_source_channel", {"source_id": source_id, "channel_id": ch_id, "channel_label": ch_label}, plot=f"EPG channel: {ch_label}\nEPG ID: {ch_id}\n\nSelect this, then choose the Bang TV Live TV channel to link it to.")
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+
+
+def manual_epg_source_channels_for_channel_menu(source_id: str, stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    """Choose the EPG channel for one already selected Bang TV channel."""
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id)
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    xbmcplugin.setPluginCategory(HANDLE, f"{label} EPG Channels")
+    xbmcplugin.setContent(HANDLE, "videos")
+    choices: List[Tuple[str, str]] = []
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress_create(progress, ADDON_NAME, f"Loading {label} EPG", "Reading channel list...")
+        choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=True, progress=progress)
+        try:
+            progress_update(progress, 100, "EPG loaded", f"Found {len(choices)} channels")
+        except Exception:
+            pass
+    except Exception as exc:
+        log(f"EPG source channel-for-channel menu crashed: {exc}", xbmc.LOGERROR)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    add_action(f"Loaded EPG channels: {len(choices)}", "manual_epg_source_info", {"source_id": source_id}, plot=f"Assigning to Bang TV channel:\n{name}")
+    if not choices:
+        add_action("No EPG channels found", "manual_epg_sources_for_channel", {"stream_id": stream_id, "name": name})
+    else:
+        target = norm_epg_key(name)
+        def score(pair: Tuple[str, str]) -> Tuple[int, str]:
+            cid, lbl = pair
+            key = norm_epg_key(lbl)
+            if target and key == target:
+                return (0, lbl.lower())
+            if target and (target in key or key in target):
+                return (1, lbl.lower())
+            return (2, lbl.lower())
+        for ch_id, ch_label in sorted(choices, key=score)[:3000]:
+            add_action(str(ch_label), "manual_epg_assign_to_stream", {"source_id": source_id, "channel_id": ch_id, "channel_label": ch_label, "stream_id": stream_id, "name": name, "cat_id": cat_id, "title": title}, plot=f"Assign EPG channel:\n{ch_label}\n\nEPG ID: {ch_id}\n\nTo Bang TV channel:\n{name}")
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+# ---- end v1.0.32 overrides ----
+
+
+# ---- v1.0.34 EPG source loading final robust fix ----
+def _btv_http_get_bytes_multi(url: str, progress: Any = None) -> Tuple[bytes, str, str]:
+    """Try several download methods so XMLTV.GZ sources work inside Kodi."""
+    last_error = ""
+    candidates = _epg_source_candidate_urls(url)
+    for idx, candidate in enumerate(candidates):
+        pct = min(8 + idx * 18, 48)
+        if progress:
+            try:
+                progress_update(progress, pct, "Downloading EPG source...", candidate[:110])
+            except Exception:
+                pass
+        # Method 1: addon session
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 Kodi BangTV EPG Manager/1.0.35",
+                "Accept": "*/*",
+                "Accept-Encoding": "gzip, deflate, identity",
+                "Cache-Control": "no-cache",
+            }
+            r = SESSION.get(candidate, timeout=90, headers=headers, allow_redirects=True)
+            r.raise_for_status()
+            raw = r.content or b""
+            if raw:
+                return raw, candidate, ""
+            last_error = "Downloaded empty file"
+        except Exception as exc:
+            last_error = str(exc)
+            log(f"EPG requests download failed: {redact_url(candidate)} - {exc}", xbmc.LOGWARNING)
+        # Method 2: urllib, useful on some Kodi Python builds
+        try:
+            import urllib.request
+            req = urllib.request.Request(candidate, headers={
+                "User-Agent": "Mozilla/5.0 Kodi BangTV EPG Manager/1.0.35",
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+                "Cache-Control": "no-cache",
+            })
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                raw = resp.read() or b""
+            if raw:
+                return raw, candidate, ""
+            last_error = "Downloaded empty file with urllib"
+        except Exception as exc:
+            last_error = str(exc)
+            log(f"EPG urllib download failed: {redact_url(candidate)} - {exc}", xbmc.LOGWARNING)
+    return b"", "", last_error or "Could not download EPG source"
+
+
+def _btv_to_plain_xml(raw: bytes, progress: Any = None) -> Tuple[bytes, str]:
+    """Convert gzip/deflate/plain XML bytes into plain XML bytes and a status."""
+    if not raw:
+        return b"", "empty"
+    data = raw
+    # Some servers/clients return already decompressed XML.
+    if data.lstrip()[:1] == b"<":
+        return data, "plain xml"
+    # True gzip file magic.
+    if data[:2] == b"\x1f\x8b":
+        if progress:
+            try: progress.update(55, "Decompressing epg.xml.gz...")
+            except Exception: pass
+        try:
+            return gzip.decompress(data), "gzip decompressed"
+        except Exception:
+            try:
+                import io
+                with gzip.GzipFile(fileobj=io.BytesIO(data)) as gz:
+                    return gz.read(), "gzipfile decompressed"
+            except Exception as exc:
+                log(f"gzip decompress failed: {exc}", xbmc.LOGWARNING)
+    # Try zlib wrappers just in case.
+    try:
+        import zlib
+        out = zlib.decompress(data, 16 + zlib.MAX_WBITS)
+        if out:
+            return out, "zlib gzip decompressed"
+    except Exception:
+        pass
+    try:
+        import zlib
+        out = zlib.decompress(data)
+        if out:
+            return out, "zlib decompressed"
+    except Exception:
+        pass
+    return data, "unknown/raw"
+
+
+def _btv_extract_xmltv_channels_stream(xml_bytes: bytes, progress: Any = None) -> Tuple[List[Tuple[str, str]], str]:
+    """Extract XMLTV channel rows using streaming parse plus regex fallback."""
+    if not xml_bytes:
+        return [], "no xml bytes"
+    stripped = xml_bytes.lstrip()
+    if not stripped.startswith(b"<"):
+        preview = stripped[:180].decode("utf-8", "ignore").replace("\n", " ")
+        return [], "not xml: " + preview
+    choices: List[Tuple[str, str]] = []
+    seen = set()
+    # Streaming parse is safer than fromstring for large 7 day guides.
+    try:
+        import io
+        if progress:
+            try: progress.update(68, "Reading EPG channel list...")
+            except Exception: pass
+        for idx, (event, elem) in enumerate(ET.iterparse(io.BytesIO(xml_bytes), events=("end",))):
+            tag = str(elem.tag or "").split("}")[-1].lower()
+            if tag == "channel":
+                ch_id = str(elem.get("id") or "").strip()
+                if ch_id and ch_id not in seen:
+                    label = ch_id
+                    names = []
+                    for child in list(elem):
+                        ctag = str(child.tag or "").split("}")[-1].lower()
+                        if ctag == "display-name":
+                            txt = "".join(child.itertext()).strip()
+                            if txt and txt not in names:
+                                names.append(txt)
+                    if names:
+                        label = names[0]
+                    seen.add(ch_id)
+                    choices.append((ch_id, label))
+                    if progress and len(choices) % 20 == 0:
+                        try: progress.update(min(70 + len(choices)//2, 94), f"Found {len(choices)} EPG channels...", label[:90])
+                        except Exception: pass
+                try: elem.clear()
+                except Exception: pass
+            elif tag == "programme" and choices:
+                # Channels normally come before programmes. Stop early once programme data starts.
+                break
+        if choices:
+            choices.sort(key=lambda row: row[1].lower())
+            return choices, f"stream parser found {len(choices)}"
+    except Exception as exc:
+        log(f"Streaming XMLTV channel parse failed: {exc}", xbmc.LOGWARNING)
+    # Regex fallback, including self closing channels.
+    try:
+        if progress:
+            try: progress.update(82, "Using fallback channel scanner...")
+            except Exception: pass
+        text = xml_bytes.decode("utf-8", "ignore")
+        first_programme = text.find("<programme")
+        scan = text[:first_programme] if first_programme > 0 else text
+        for m in re.finditer(r"<channel\b([^>]*?)(?:>(.*?)</channel\s*>|/>)", scan, re.I | re.S):
+            attrs = m.group(1) or ""
+            body = m.group(2) or ""
+            id_match = re.search(r"\bid\s*=\s*[\"']([^\"']+)[\"']", attrs, re.I)
+            if not id_match:
+                continue
+            ch_id = html_unescape(id_match.group(1)).strip()
+            if not ch_id or ch_id in seen:
+                continue
+            label = ch_id
+            dn = re.search(r"<display-name\b[^>]*>(.*?)</display-name\s*>", body, re.I | re.S)
+            if dn:
+                label = html_unescape(re.sub(r"<[^>]+>", "", dn.group(1) or "")).strip() or ch_id
+            seen.add(ch_id)
+            choices.append((ch_id, label))
+        choices.sort(key=lambda row: row[1].lower())
+        return choices, f"regex found {len(choices)}"
+    except Exception as exc:
+        log(f"Regex XMLTV channel parse failed: {exc}", xbmc.LOGWARNING)
+    return [], "no <channel> elements found"
+
+
+def xmltv_channel_choices(url: str, cache_key: str, force_refresh: bool = False, progress: Any = None) -> List[Tuple[str, str]]:
+    """v1.0.34 final override: load .xml.gz, parse channels, never silently return stale empty data."""
+    try:
+        if not url:
+            return []
+        cache_id = "xmltv_channels_" + re.sub(r"[^A-Za-z0-9_]+", "_", cache_key or str(abs(hash(url))))[:80]
+        if not force_refresh:
+            cached = metadata_cache_get("epg_source_channels", cache_id, ttl=EPG_TTL_SECONDS)
+            if isinstance(cached, dict):
+                items = cached.get("items")
+                if isinstance(items, list) and items:
+                    return [(str(a), str(b)) for a, b in items if a]
+        raw, used_url, err = _btv_http_get_bytes_multi(url, progress)
+        if not raw:
+            log(f"EPG source download returned no data: {redact_url(url)} error={err}", xbmc.LOGWARNING)
+            return []
+        xml_bytes, decode_status = _btv_to_plain_xml(raw, progress)
+        choices, parse_status = _btv_extract_xmltv_channels_stream(xml_bytes, progress)
+        try:
+            metadata_cache_set("epg_source_debug", cache_id, {"url": used_url or url, "bytes": len(raw), "xml_bytes": len(xml_bytes or b""), "decode": decode_status, "parse": parse_status, "count": len(choices), "updated": int(time.time())})
+        except Exception:
+            pass
+        if choices:
+            metadata_cache_set("epg_source_channels", cache_id, {"items": choices, "used_url": used_url, "updated": int(time.time()), "count": len(choices)})
+        else:
+            log(f"EPG source parsed 0 channels. decode={decode_status} parse={parse_status} bytes={len(raw)} xml_bytes={len(xml_bytes or b'')}", xbmc.LOGWARNING)
+        return choices
+    except Exception as exc:
+        log(f"xmltv_channel_choices v1.0.34 crashed: {exc}", xbmc.LOGERROR)
+        return []
+
+
+def manual_epg_source_channels_menu(source_id: str) -> None:
+    """Open EPG source and list all channels with visible loading and debug on failure."""
+    xbmcplugin.setPluginCategory(HANDLE, "Sky GO NZ EPG Channels" if source_id == "skygo" else "EPG Channels")
+    xbmcplugin.setContent(HANDLE, "videos")
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id or "EPG Source")
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    # Force Sky GO NZ to the correct current URL even if old settings/cache stored another one.
+    if source_id == "skygo":
+        label = "Sky GO NZ"
+        url = "https://i.mjh.nz/SkyGo/epg.xml.gz"
+    choices: List[Tuple[str, str]] = []
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress_create(progress, ADDON_NAME, f"Loading {label} EPG", "Downloading guide...")
+        choices = xmltv_channel_choices(url, "manual_source_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id or label)[:80], force_refresh=True, progress=progress)
+        try: progress_update(progress, 100, "EPG loaded", f"Found {len(choices)} channels")
+        except Exception: pass
+        xbmc.sleep(350)
+    except Exception as exc:
+        log(f"manual_epg_source_channels_menu v1.0.34 crashed: {exc}", xbmc.LOGERROR)
+    finally:
+        try: progress.close()
+        except Exception: pass
+    add_action(f"Source: {label}", "manual_epg_source_info", {"source_id": source_id}, plot=f"URL: {url}\nChannels found: {len(choices)}")
+    add_action("Refresh this EPG source", "manual_epg_refresh_one_source", {"source_id": source_id}, plot="Force download and parse this XMLTV source again.")
+    if not choices:
+        cache_id = "xmltv_channels_" + re.sub(r"[^A-Za-z0-9_]+", "_", ("manual_source_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id or label)[:80]))[:80]
+        debug = metadata_cache_get("epg_source_debug", cache_id, ttl=86400) or {}
+        dbg = "\n".join([f"{k}: {v}" for k, v in debug.items()]) if isinstance(debug, dict) else ""
+        add_action("No EPG channels found", "manual_epg_sources", plot=f"Could not read channels from this EPG.\n\nURL: {url}\n\n{dbg}")
+    else:
+        add_action(f"EPG channels loaded: {len(choices)}", "manual_epg_source_info", {"source_id": source_id}, plot="Choose an EPG channel below, then choose the Bang TV channel to assign it to.")
+        for ch_id, ch_label in choices[:5000]:
+            add_action(str(ch_label), "manual_epg_assign_from_source_channel", {"source_id": source_id, "channel_id": ch_id, "channel_label": ch_label}, plot=f"EPG channel: {ch_label}\nEPG ID: {ch_id}\n\nSelect this, then choose the Bang TV Live TV channel to link it to.")
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+
+
+def manual_epg_source_channels_for_channel_menu(source_id: str, stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    """Choose the EPG channel for one selected Bang TV channel."""
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id or "EPG Source")
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    if source_id == "skygo":
+        label = "Sky GO NZ"
+        url = "https://i.mjh.nz/SkyGo/epg.xml.gz"
+    xbmcplugin.setPluginCategory(HANDLE, f"{label} EPG Channels")
+    xbmcplugin.setContent(HANDLE, "videos")
+    progress = xbmcgui.DialogProgress()
+    choices: List[Tuple[str, str]] = []
+    try:
+        progress_create(progress, ADDON_NAME, f"Loading {label} EPG", "Downloading guide...")
+        choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=True, progress=progress)
+        try: progress_update(progress, 100, "EPG loaded", f"Found {len(choices)} channels")
+        except Exception: pass
+        xbmc.sleep(350)
+    except Exception as exc:
+        log(f"manual_epg_source_channels_for_channel v1.0.34 crashed: {exc}", xbmc.LOGERROR)
+    finally:
+        try: progress.close()
+        except Exception: pass
+    add_action(f"Loaded EPG channels: {len(choices)}", "manual_epg_source_info", {"source_id": source_id}, plot=f"Assigning to Bang TV channel:\n{name}")
+    if not choices:
+        add_action("No EPG channels found", "manual_epg_sources_for_channel", {"stream_id": stream_id, "name": name}, plot=f"Could not read EPG channels from {label}. Try Refresh this EPG source.")
+    else:
+        target = norm_epg_key(name)
+        def score(pair: Tuple[str, str]) -> Tuple[int, str]:
+            cid, lbl = pair
+            key = norm_epg_key(lbl)
+            if target and key == target: return (0, lbl.lower())
+            if target and (target in key or key in target): return (1, lbl.lower())
+            return (2, lbl.lower())
+        for ch_id, ch_label in sorted(choices, key=score)[:5000]:
+            add_action(str(ch_label), "manual_epg_assign_to_stream", {"source_id": source_id, "channel_id": ch_id, "channel_label": ch_label, "stream_id": stream_id, "name": name, "cat_id": cat_id, "title": title}, plot=f"Assign EPG channel:\n{ch_label}\n\nEPG ID: {ch_id}\n\nTo Bang TV channel:\n{name}")
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+# ---- end v1.0.34 EPG source loading final robust fix ----
+
+
+# ---- v1.0.35 EPG source loader, force real channel extraction ----
+def _btv_parse_xmltv_channels_v35(xml_bytes: bytes, progress: Any = None) -> Tuple[List[Tuple[str, str]], str]:
+    """Very tolerant XMLTV channel extractor.
+
+    Some feeds can have channel rows, some can have a doctype, and some Kodi
+    builds are fussy with huge XML. This first scans raw text for <channel>
+    display names, then falls back to programme channel ids so the user always
+    gets something selectable from the EPG source.
+    """
+    if not xml_bytes:
+        return [], "empty xml"
+    text = xml_bytes.decode('utf-8', 'ignore')
+    if not text.lstrip().startswith('<'):
+        return [], 'not xml: ' + text[:180].replace('\n', ' ')
+    choices = []
+    seen = set()
+    if progress:
+        try: progress_update(progress, 65, 'Reading EPG channels...', 'Scanning XMLTV channel list')
+        except Exception: pass
+    # Fast raw scan for channels before programmes, but do not require them to be before programme.
+    channel_pat = re.compile(r'<\s*channel\b([^>]*)>(.*?)<\s*/\s*channel\s*>', re.I | re.S)
+    for m in channel_pat.finditer(text):
+        attrs = m.group(1) or ''
+        body = m.group(2) or ''
+        im = re.search(r'\bid\s*=\s*["\']([^"\']+)["\']', attrs, re.I)
+        if not im:
+            continue
+        ch_id = html_unescape(im.group(1)).strip()
+        if not ch_id or ch_id in seen:
+            continue
+        names = []
+        for dm in re.finditer(r'<\s*display-name\b[^>]*>(.*?)<\s*/\s*display-name\s*>', body, re.I | re.S):
+            nm = html_unescape(re.sub(r'<[^>]+>', '', dm.group(1) or '')).strip()
+            if nm and nm not in names:
+                names.append(nm)
+        label = names[0] if names else ch_id
+        seen.add(ch_id)
+        choices.append((ch_id, label))
+        if progress and len(choices) % 25 == 0:
+            try: progress_update(progress, min(66 + len(choices)//2, 88), f'Found {len(choices)} EPG channels...', label[:90])
+            except Exception: pass
+    # Self-closing channel rows, uncommon but harmless to support.
+    for m in re.finditer(r'<\s*channel\b([^>]*)/\s*>', text, re.I | re.S):
+        attrs = m.group(1) or ''
+        im = re.search(r'\bid\s*=\s*["\']([^"\']+)["\']', attrs, re.I)
+        if not im:
+            continue
+        ch_id = html_unescape(im.group(1)).strip()
+        if ch_id and ch_id not in seen:
+            seen.add(ch_id); choices.append((ch_id, ch_id))
+    if choices:
+        choices.sort(key=lambda row: row[1].lower())
+        return choices, f'channel elements found {len(choices)}'
+    # Fallback: if this EPG has programme rows but no channel list, show each programme channel id.
+    if progress:
+        try: progress_update(progress, 82, 'No channel rows found...', 'Scanning programme channel IDs')
+        except Exception: pass
+    prog_seen = set()
+    for m in re.finditer(r'<\s*programme\b([^>]*)>', text, re.I | re.S):
+        attrs = m.group(1) or ''
+        cm = re.search(r'\bchannel\s*=\s*["\']([^"\']+)["\']', attrs, re.I)
+        if not cm:
+            continue
+        cid = html_unescape(cm.group(1)).strip()
+        if cid and cid not in prog_seen:
+            prog_seen.add(cid)
+            label = cid
+            # Turn common ids into nicer labels while keeping id exact for assignment.
+            label = re.sub(r'[-_.]+', ' ', label).strip()
+            label = re.sub(r'\s+', ' ', label)
+            choices.append((cid, label or cid))
+            if progress and len(choices) % 25 == 0:
+                try: progress_update(progress, min(84 + len(choices)//4, 94), f'Found {len(choices)} EPG channel IDs...', cid[:90])
+                except Exception: pass
+    choices.sort(key=lambda row: row[1].lower())
+    return choices, f'programme channel ids found {len(choices)}'
+
+
+def xmltv_channel_choices(url: str, cache_key: str, force_refresh: bool = False, progress: Any = None) -> List[Tuple[str, str]]:
+    """v1.0.35: always load Sky GO NZ channel list, including .xml.gz and programme-id fallback."""
+    try:
+        if not url:
+            return []
+        # Force current Sky GO NZ URL when this is the built-in source.
+        if 'SkyGo' in url or 'skygo' in str(cache_key).lower():
+            url = 'https://i.mjh.nz/SkyGo/epg.xml.gz'
+        cache_id = 'xmltv_channels_' + re.sub(r'[^A-Za-z0-9_]+', '_', cache_key or str(abs(hash(url))))[:80]
+        if not force_refresh:
+            cached = metadata_cache_get('epg_source_channels', cache_id, ttl=EPG_TTL_SECONDS)
+            if isinstance(cached, dict):
+                items = cached.get('items')
+                if isinstance(items, list) and items:
+                    return [(str(a), str(b)) for a, b in items if a]
+        if progress:
+            try: progress_update(progress, 5, 'Loading EPG source...', 'Preparing download')
+            except Exception: pass
+        raw, used_url, err = _btv_http_get_bytes_multi(url, progress)
+        if not raw:
+            metadata_cache_set('epg_source_debug', cache_id, {'url': url, 'error': err, 'count': 0, 'updated': int(time.time())})
+            log(f'EPG source download returned no data: {redact_url(url)} error={err}', xbmc.LOGWARNING)
+            return []
+        xml_bytes, decode_status = _btv_to_plain_xml(raw, progress)
+        choices, parse_status = _btv_parse_xmltv_channels_v35(xml_bytes, progress)
+        try:
+            metadata_cache_set('epg_source_debug', cache_id, {
+                'url': used_url or url,
+                'raw_bytes': len(raw),
+                'xml_bytes': len(xml_bytes or b''),
+                'decode': decode_status,
+                'parse': parse_status,
+                'count': len(choices),
+                'preview': (xml_bytes or b'')[:220].decode('utf-8', 'ignore').replace('\n',' '),
+                'updated': int(time.time())
+            })
+        except Exception:
+            pass
+        if choices:
+            metadata_cache_set('epg_source_channels', cache_id, {'items': choices, 'used_url': used_url or url, 'updated': int(time.time()), 'count': len(choices)})
+        else:
+            log(f'EPG source parsed 0 channels. decode={decode_status} parse={parse_status} bytes={len(raw)} xml_bytes={len(xml_bytes or b"")}', xbmc.LOGWARNING)
+        return choices
+    except Exception as exc:
+        log(f'xmltv_channel_choices v1.0.35 crashed: {exc}', xbmc.LOGERROR)
+        return []
+
+
+def manual_epg_source_channels_menu(source_id: str) -> None:
+    """Open EPG source and list all channels, with visible loading and debug info."""
+    data = manual_epg_load()
+    src = (data.get('sources') or {}).get(source_id) or {}
+    label = str(src.get('label') or source_id or 'EPG Source')
+    url = str(src.get('url') or '') or manual_epg_source_url(source_id)
+    if source_id == 'skygo':
+        label = 'Sky GO NZ'
+        url = 'https://i.mjh.nz/SkyGo/epg.xml.gz'
+    xbmcplugin.setPluginCategory(HANDLE, f'{label} EPG Channels')
+    xbmcplugin.setContent(HANDLE, 'videos')
+    choices: List[Tuple[str, str]] = []
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress_create(progress, ADDON_NAME, f'Loading {label} EPG', 'Downloading and reading channel list')
+        choices = xmltv_channel_choices(url, 'manual_source_' + re.sub(r'[^A-Za-z0-9_]+', '_', source_id or label)[:80], force_refresh=True, progress=progress)
+        try: progress_update(progress, 100, 'EPG channels loaded', f'Found {len(choices)} channels')
+        except Exception: pass
+        xbmc.sleep(500)
+    except Exception as exc:
+        log(f'manual_epg_source_channels_menu v1.0.35 crashed: {exc}', xbmc.LOGERROR)
+    finally:
+        try: progress.close()
+        except Exception: pass
+    add_action(f'EPG channels loaded: {len(choices)}', 'manual_epg_source_info', {'source_id': source_id}, plot=f'Source: {label}\nURL: {url}\nChannels found: {len(choices)}')
+    add_action('Refresh this EPG source', 'manual_epg_refresh_one_source', {'source_id': source_id}, plot='Force download and parse this XMLTV source again.')
+    if not choices:
+        cache_id = 'xmltv_channels_' + re.sub(r'[^A-Za-z0-9_]+', '_', ('manual_source_' + re.sub(r'[^A-Za-z0-9_]+', '_', source_id or label)[:80]))[:80]
+        debug = metadata_cache_get('epg_source_debug', cache_id, ttl=86400) or {}
+        dbg = '\n'.join([f'{k}: {v}' for k, v in debug.items()]) if isinstance(debug, dict) else ''
+        add_action('Still no EPG channels found, open this for debug info', 'manual_epg_source_info', {'source_id': source_id}, plot=f'Bang TV downloaded/read attempted this source but found 0 channels.\n\nURL: {url}\n\n{dbg}')
+    else:
+        add_action('Select an EPG channel below, then choose Bang TV channel', 'manual_epg_source_info', {'source_id': source_id}, plot='Pick one of the EPG channels below. After that, choose the Bang TV live channel to assign it to.')
+        for ch_id, ch_label in choices[:5000]:
+            add_action(str(ch_label), 'manual_epg_assign_from_source_channel', {'source_id': source_id, 'channel_id': ch_id, 'channel_label': ch_label}, plot=f'EPG channel: {ch_label}\nEPG ID: {ch_id}\n\nSelect this, then choose the Bang TV Live TV channel to link it to.')
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+
+
+def manual_epg_source_channels_for_channel_menu(source_id: str, stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    data = manual_epg_load()
+    src = (data.get('sources') or {}).get(source_id) or {}
+    label = str(src.get('label') or source_id or 'EPG Source')
+    url = str(src.get('url') or '') or manual_epg_source_url(source_id)
+    if source_id == 'skygo':
+        label = 'Sky GO NZ'
+        url = 'https://i.mjh.nz/SkyGo/epg.xml.gz'
+    xbmcplugin.setPluginCategory(HANDLE, f'{label} EPG Channels')
+    xbmcplugin.setContent(HANDLE, 'videos')
+    choices: List[Tuple[str, str]] = []
+    progress = xbmcgui.DialogProgress()
+    try:
+        progress_create(progress, ADDON_NAME, f'Loading {label} EPG', f'Assigning to {name}')
+        choices = xmltv_channel_choices(url, 'manual_select_' + re.sub(r'[^A-Za-z0-9_]+', '_', source_id or label)[:80], force_refresh=True, progress=progress)
+        try: progress_update(progress, 100, 'EPG channels loaded', f'Found {len(choices)} channels')
+        except Exception: pass
+        xbmc.sleep(500)
+    except Exception as exc:
+        log(f'manual_epg_source_channels_for_channel v1.0.35 crashed: {exc}', xbmc.LOGERROR)
+    finally:
+        try: progress.close()
+        except Exception: pass
+    add_action(f'Loaded EPG channels: {len(choices)}', 'manual_epg_source_info', {'source_id': source_id}, plot=f'Assigning to Bang TV channel:\n{name}')
+    if not choices:
+        add_action('No EPG channels found, open EPG source debug info', 'manual_epg_source_info', {'source_id': source_id}, plot=f'Could not read EPG channels from {label}.')
+    else:
+        target = norm_epg_key(name)
+        def score(pair: Tuple[str, str]) -> Tuple[int, str]:
+            cid, lbl = pair
+            key = norm_epg_key(lbl)
+            if target and key == target: return (0, lbl.lower())
+            if target and (target in key or key in target): return (1, lbl.lower())
+            return (2, lbl.lower())
+        for ch_id, ch_label in sorted(choices, key=score)[:5000]:
+            add_action(str(ch_label), 'manual_epg_assign_to_stream', {'source_id': source_id, 'channel_id': ch_id, 'channel_label': ch_label, 'stream_id': stream_id, 'name': name}, plot=f'Assign EPG channel:\n{ch_label}\n\nEPG ID: {ch_id}\n\nTo Bang TV channel:\n{name}')
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+# ---- end v1.0.35 EPG source loader ----
+
+
+# ---- v1.0.37 manual EPG right-click assignment flow ----
+def _btv_refresh_after_epg_assign(cat_id: str = "") -> None:
+    """Refresh the screen the user assigned from so the new EPG appears straight away."""
+    try:
+        xbmc.executebuiltin("Container.Refresh")
+        xbmc.sleep(250)
+    except Exception:
+        pass
+    if cat_id:
+        try:
+            # When assignment is launched from a live category context menu, jump back to that
+            # category and replace the EPG picker folder, so the user immediately sees the data.
+            xbmc.executebuiltin('Container.Update(%s,replace)' % build_url({"mode": "live_streams", "cat_id": str(cat_id)}))
+        except Exception as exc:
+            log(f"EPG assign category refresh failed: {exc}", xbmc.LOGWARNING)
+
+
+def manual_epg_assign(stream_id: str = "", name: str = "", cat_id: str = "") -> None:
+    """Context-menu Assign EPG flow.
+
+    Right-click channel -> Assign EPG to this channel:
+    - lets user choose Sky GO NZ or another source
+    - downloads/parses the source on demand if it has not been loaded before
+    - lets user choose EPG channel
+    - saves the mapping
+    - shows success
+    - refreshes the current Live TV directory straight away
+    """
+    sid = str(stream_id or "").strip()
+    if not sid:
+        sid = xbmcgui.Dialog().input("Live TV stream ID", type=xbmcgui.INPUT_NUMERIC).strip()
+    if not sid:
+        notify("No stream ID entered")
+        return
+
+    channel_name = str(name or "").strip()
+    if not channel_name:
+        channel_name = xbmcgui.Dialog().input("Channel name", defaultt="Live TV Channel", type=xbmcgui.INPUT_ALPHANUM).strip() or sid
+
+    source_id, source_label, url = manual_epg_source_select()
+    if not url:
+        notify("EPG assignment cancelled")
+        return
+    if source_id == "skygo":
+        source_label = "Sky GO NZ"
+        url = "https://i.mjh.nz/SkyGo/epg.xml.gz"
+
+    progress = xbmcgui.DialogProgress()
+    choices: List[Tuple[str, str]] = []
+    try:
+        progress_create(progress, ADDON_NAME, f"Loading {source_label} EPG", "Downloading guide if needed...")
+        choices = xmltv_channel_choices(
+            url,
+            "manual_assign_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id or source_label)[:80],
+            force_refresh=False,
+            progress=progress,
+        )
+        try:
+            progress_update(progress, 100, "EPG channels ready", f"Found {len(choices)} channels")
+            xbmc.sleep(300)
+        except Exception:
+            pass
+    except Exception as exc:
+        log(f"manual_epg_assign v1.0.37 EPG load crashed: {exc}", xbmc.LOGERROR)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+
+    if not choices:
+        xbmcgui.Dialog().ok(ADDON_NAME, f"No EPG channels found in {source_label}.\n\nTry Tools > EPG Manager > Refresh EPG Sources, then try again.")
+        return
+
+    target = norm_epg_key(channel_name)
+    ordered = sorted(
+        choices,
+        key=lambda pair: (
+            0 if target and norm_epg_key(pair[1]) == target else
+            1 if target and (target in norm_epg_key(pair[1]) or norm_epg_key(pair[1]) in target) else
+            2,
+            str(pair[1]).lower()
+        )
+    )
+    labels = [f"{lbl}  [{cid}]" for cid, lbl in ordered]
+    idx = xbmcgui.Dialog().select(f"Assign EPG to {channel_name}", labels)
+    if idx < 0:
+        notify("EPG assignment cancelled")
+        return
+
+    ch_id, ch_label = ordered[idx]
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    source_label = str(src.get("label") or source_label or source_id)
+    key = manual_epg_channel_key(sid, channel_name)
+    data.setdefault("channels", {})[key] = {
+        "stream_id": sid,
+        "name": channel_name,
+        "source_id": source_id,
+        "source_label": source_label,
+        "url": url,
+        "channel_id": ch_id,
+        "channel_label": ch_label,
+        "updated": int(time.time()),
+    }
+    manual_epg_save(data)
+
+    # Clear related live metadata cache so the current folder rebuild pulls the manual EPG now/next.
+    try:
+        metadata_cache_delete("live_streams", str(cat_id or ""))
+    except Exception:
+        pass
+
+    add_bang_notification(f"Manual EPG assigned: {channel_name} → {ch_label}", "Updates")
+    add_activity(f"Manual EPG assigned for {channel_name}", "updates")
+    notify(f"EPG assigned: {channel_name} → {ch_label}")
+    try:
+        xbmcgui.Dialog().notification(ADDON_NAME, f"EPG assigned to {channel_name}", xbmcgui.NOTIFICATION_INFO, 3500)
+    except Exception:
+        pass
+    _btv_refresh_after_epg_assign(cat_id)
+
+
+def manual_epg_assign_to_stream(source_id: str, channel_id: str, channel_label: str, stream_id: str, name: str, cat_id: str = "") -> None:
+    source_id = str(source_id or "")
+    channel_id = str(channel_id or "")
+    channel_label = str(channel_label or channel_id)
+    stream_id = str(stream_id or "")
+    name = str(name or stream_id or "Live TV Channel")
+    if not stream_id or not channel_id:
+        notify("Missing channel or EPG ID", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    source_label = str(src.get("label") or source_id)
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    if source_id == "skygo":
+        source_label = "Sky GO NZ"
+        url = "https://i.mjh.nz/SkyGo/epg.xml.gz"
+    key = manual_epg_channel_key(stream_id, name)
+    data.setdefault("channels", {})[key] = {
+        "stream_id": stream_id,
+        "name": name,
+        "source_id": source_id,
+        "source_label": source_label,
+        "url": url,
+        "channel_id": channel_id,
+        "channel_label": channel_label,
+        "updated": int(time.time()),
+    }
+    manual_epg_save(data)
+    add_bang_notification(f"Manual EPG assigned: {name} → {channel_label}", "Updates")
+    add_activity(f"Manual EPG assigned for {name}", "updates")
+    notify(f"EPG assigned: {name} → {channel_label}")
+    try:
+        xbmcgui.Dialog().notification(ADDON_NAME, f"EPG assigned to {name}", xbmcgui.NOTIFICATION_INFO, 3500)
+    except Exception:
+        pass
+    _btv_refresh_after_epg_assign(cat_id)
+# ---- end v1.0.37 manual EPG right-click assignment flow ----
+
+
+# ---- v1.0.38 final manual EPG assign flow fix ----
+def _btv_epg_source_items() -> List[Tuple[str, str, str]]:
+    data = manual_epg_load()
+    sources = ensure_builtin_epg_sources(data).get("sources") or {}
+    rows = []
+    for sid, src in sources.items():
+        if not src.get("enabled", True):
+            continue
+        label = str(src.get("label") or sid)
+        url = str(src.get("url") or "") or manual_epg_source_url(sid)
+        if sid == "skygo":
+            label = "Sky GO NZ"
+            url = SKYGO_EPG_URL
+        rows.append((str(sid), label, url))
+    rows.sort(key=lambda r: (0 if r[0] == "skygo" else 1, r[1].lower()))
+    return rows
+
+
+def _btv_save_epg_assignment(source_id: str, channel_id: str, channel_label: str, stream_id: str, name: str) -> None:
+    data = manual_epg_load()
+    data = ensure_builtin_epg_sources(data)
+    src = (data.get("sources") or {}).get(source_id) or {}
+    source_label = str(src.get("label") or source_id)
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    if source_id == "skygo":
+        source_label = "Sky GO NZ"
+        url = SKYGO_EPG_URL
+    key = manual_epg_channel_key(stream_id, name)
+    data.setdefault("channels", {})[key] = {
+        "stream_id": str(stream_id),
+        "name": str(name),
+        "source_id": str(source_id),
+        "source_label": source_label,
+        "url": url,
+        "channel_id": str(channel_id),
+        "channel_label": str(channel_label or channel_id),
+        "updated": int(time.time()),
+    }
+    manual_epg_save(data)
+
+
+def _btv_finish_epg_assignment(name: str, channel_label: str, cat_id: str = "") -> None:
+    add_bang_notification(f"Manual EPG assigned: {name} → {channel_label}", "Updates")
+    add_activity(f"Manual EPG assigned for {name}", "updates")
+    try:
+        xbmcgui.Dialog().notification(ADDON_NAME, f"EPG assigned to {name}", xbmcgui.NOTIFICATION_INFO, 4000)
+    except Exception:
+        pass
+    try:
+        xbmc.executebuiltin(f'Notification({ADDON_NAME},EPG assigned and refreshing folder,3000)')
+    except Exception:
+        pass
+    try:
+        xbmc.executebuiltin("Container.Refresh")
+        xbmc.sleep(300)
+    except Exception:
+        pass
+    if cat_id:
+        try:
+            xbmc.executebuiltin('Container.Update(%s,replace)' % build_url({"mode": "live_streams", "cat_id": str(cat_id)}))
+        except Exception as exc:
+            log(f"EPG assign Container.Update failed: {exc}", xbmc.LOGWARNING)
+
+
+def manual_epg_assign(stream_id: str = "", name: str = "", cat_id: str = "") -> None:
+    """Right click channel -> Assign EPG to this channel.
+
+    This is now a direct popup flow, not a hidden folder flow:
+    choose source, download on demand with visible progress, choose EPG channel,
+    save, notify, then refresh/reopen the current Live TV category.
+    """
+    sid = str(stream_id or "").strip()
+    channel_name = str(name or sid or "Live TV Channel").strip()
+    if not sid:
+        sid = xbmcgui.Dialog().input("Live TV stream ID", type=xbmcgui.INPUT_ALPHANUM).strip()
+    if not sid:
+        notify("No channel selected", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    if not channel_name or channel_name == sid:
+        channel_name = xbmcgui.Dialog().input("Channel name", defaultt=channel_name or sid, type=xbmcgui.INPUT_ALPHANUM).strip() or sid
+
+    sources = _btv_epg_source_items()
+    if not sources:
+        notify("No EPG sources enabled", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    labels = [("⭐ " if source_id == "skygo" else "") + label for source_id, label, url in sources]
+    src_idx = xbmcgui.Dialog().select("Choose EPG source", labels)
+    if src_idx < 0:
+        notify("EPG assignment cancelled")
+        return
+    source_id, source_label, url = sources[src_idx]
+
+    progress = xbmcgui.DialogProgress()
+    choices: List[Tuple[str, str]] = []
+    try:
+        progress_create(progress, ADDON_NAME, f"Loading {source_label} EPG", "Downloading and reading channels...")
+        choices = xmltv_channel_choices(url, "manual_assign_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=False, progress=progress)
+        if not choices:
+            # Force a fresh download if cached list was empty/stale.
+            choices = xmltv_channel_choices(url, "manual_assign_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=True, progress=progress)
+        try:
+            progress_update(progress, 100, "EPG loaded", f"Found {len(choices)} channels")
+            xbmc.sleep(350)
+        except Exception:
+            pass
+    except Exception as exc:
+        log(f"Manual EPG context assign load failed: {exc}", xbmc.LOGERROR)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+
+    if not choices:
+        xbmcgui.Dialog().ok(ADDON_NAME, f"No EPG channels found for {source_label}.\n\nTry Tools → EPG Manager → Refresh EPG Sources.")
+        return
+
+    target = norm_epg_key(channel_name)
+    def score(pair: Tuple[str, str]) -> Tuple[int, str]:
+        ch_id, lbl = pair
+        key = norm_epg_key(lbl)
+        if target and key == target:
+            return (0, lbl.lower())
+        if target and (target in key or key in target):
+            return (1, lbl.lower())
+        return (2, lbl.lower())
+    sorted_choices = sorted(choices, key=score)[:5000]
+    epg_labels = [label for _cid, label in sorted_choices]
+    epg_idx = xbmcgui.Dialog().select(f"Assign EPG to {channel_name}", epg_labels)
+    if epg_idx < 0:
+        notify("EPG assignment cancelled")
+        return
+    epg_id, epg_label = sorted_choices[epg_idx]
+    _btv_save_epg_assignment(source_id, epg_id, epg_label, sid, channel_name)
+    _btv_finish_epg_assignment(channel_name, epg_label, cat_id)
+
+
+def manual_epg_assign_to_stream(source_id: str, channel_id: str, channel_label: str, stream_id: str, name: str, cat_id: str = "") -> None:
+    source_id = str(source_id or "")
+    channel_id = str(channel_id or "")
+    channel_label = str(channel_label or channel_id)
+    stream_id = str(stream_id or "")
+    name = str(name or stream_id or "Live TV Channel")
+    if not stream_id or not channel_id:
+        notify("Missing channel or EPG ID", icon=xbmcgui.NOTIFICATION_ERROR)
+        return
+    _btv_save_epg_assignment(source_id, channel_id, channel_label, stream_id, name)
+    _btv_finish_epg_assignment(name, channel_label, cat_id)
+
+
+def manual_epg_source_channels_for_channel_menu(source_id: str, stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    data = manual_epg_load()
+    src = (data.get("sources") or {}).get(source_id) or {}
+    label = str(src.get("label") or source_id or "EPG Source")
+    url = str(src.get("url") or "") or manual_epg_source_url(source_id)
+    if source_id == "skygo":
+        label = "Sky GO NZ"
+        url = SKYGO_EPG_URL
+    xbmcplugin.setPluginCategory(HANDLE, f"{label} EPG Channels")
+    xbmcplugin.setContent(HANDLE, "videos")
+    progress = xbmcgui.DialogProgress()
+    choices: List[Tuple[str, str]] = []
+    try:
+        progress_create(progress, ADDON_NAME, f"Loading {label} EPG", f"Assigning to {name}")
+        choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id or label)[:80], force_refresh=False, progress=progress)
+        if not choices:
+            choices = xmltv_channel_choices(url, "manual_select_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id or label)[:80], force_refresh=True, progress=progress)
+        try:
+            progress_update(progress, 100, "EPG loaded", f"Found {len(choices)} channels")
+            xbmc.sleep(300)
+        except Exception:
+            pass
+    except Exception as exc:
+        log(f"manual_epg_source_channels_for_channel v1.0.38 crashed: {exc}", xbmc.LOGERROR)
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
+    if not choices:
+        add_action("No EPG channels found", "manual_epg_sources_for_channel", {"stream_id": stream_id, "name": name, "cat_id": cat_id, "title": title}, plot=f"Could not read channels from {label}.")
+    else:
+        add_action(f"EPG channels loaded: {len(choices)}", "manual_epg_source_info", {"source_id": source_id}, plot=f"Assigning to Bang TV channel:\n{name}")
+        target = norm_epg_key(name)
+        def score(pair: Tuple[str, str]) -> Tuple[int, str]:
+            cid, lbl = pair
+            key = norm_epg_key(lbl)
+            if target and key == target:
+                return (0, lbl.lower())
+            if target and (target in key or key in target):
+                return (1, lbl.lower())
+            return (2, lbl.lower())
+        for ch_id, ch_label in sorted(choices, key=score)[:5000]:
+            add_action(str(ch_label), "manual_epg_assign_to_stream", {"source_id": source_id, "channel_id": ch_id, "channel_label": ch_label, "stream_id": stream_id, "name": name, "cat_id": cat_id}, plot=f"Assign EPG channel:\n{ch_label}\n\nEPG ID: {ch_id}\n\nTo Bang TV channel:\n{name}")
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+# ---- end v1.0.38 final manual EPG assign flow fix ----
+
+
+# ---- v1.0.40 EPG assignment refresh + Kodi args fix ----
+def _btv_finish_epg_assignment(name: str, channel_label: str, cat_id: str = "", title: str = "") -> None:
+    """Finish manual EPG assignment and refresh the correct folder.
+
+    Context-menu assignments launched from Live TV return to the Live TV category.
+    EPG Manager assignments launched from Assign by Category return to that EPG
+    Manager category channel list so the new mapping is visible immediately.
+    """
+    add_bang_notification(f"Manual EPG assigned: {name} → {channel_label}", "Updates")
+    add_activity(f"Manual EPG assigned for {name}", "updates")
+    try:
+        xbmcgui.Dialog().notification(ADDON_NAME, f"EPG assigned to {name}", xbmcgui.NOTIFICATION_INFO, 4000)
+    except Exception:
+        pass
+    try:
+        xbmc.executebuiltin(f'Notification({ADDON_NAME},EPG assigned, refreshing,3000)')
+    except Exception:
+        pass
+    try:
+        xbmc.executebuiltin("Container.Refresh")
+        xbmc.sleep(250)
+    except Exception:
+        pass
+    try:
+        if cat_id and title:
+            xbmc.executebuiltin('Container.Update(%s,replace)' % build_url({"mode": "manual_epg_live_channels", "cat_id": str(cat_id), "title": str(title)}))
+        elif cat_id:
+            xbmc.executebuiltin('Container.Update(%s,replace)' % build_url({"mode": "live_streams", "cat_id": str(cat_id)}))
+    except Exception as exc:
+        log(f"EPG assign folder refresh failed: {exc}", xbmc.LOGWARNING)
+
+
+def manual_epg_assign_to_stream(source_id: str, channel_id: str, channel_label: str, stream_id: str, name: str, cat_id: str = "", title: str = "") -> None:
+    """Save EPG mapping from either EPG Manager or channel context menu.
+
+    Kodi router passes title as the seventh arg for Assign by Category. Earlier
+    builds did not accept it, causing 'Could not load folder' after selecting an
+    EPG channel. Keep this signature broad and safe.
+    """
+    try:
+        source_id = str(source_id or "")
+        channel_id = str(channel_id or "")
+        channel_label = str(channel_label or channel_id)
+        stream_id = str(stream_id or "")
+        name = str(name or stream_id or "Live TV Channel")
+        if not stream_id or not channel_id:
+            notify("Missing channel or EPG ID", icon=xbmcgui.NOTIFICATION_ERROR)
+            return
+        _btv_save_epg_assignment(source_id, channel_id, channel_label, stream_id, name)
+        # Clear cached live/category items so now/next and plot rebuild from the new manual EPG.
+        try:
+            metadata_cache_delete("live_streams", str(cat_id or ""))
+        except Exception:
+            pass
+        _btv_finish_epg_assignment(name, channel_label, cat_id, title)
+    except Exception as exc:
+        log(f"manual_epg_assign_to_stream v1.0.40 crashed: {exc}", xbmc.LOGERROR)
+        try:
+            xbmcgui.Dialog().ok(ADDON_NAME, f"EPG assignment failed:\n{exc}")
+        except Exception:
+            pass
+
+
+def manual_epg_assign(stream_id: str = "", name: str = "", cat_id: str = "") -> None:
+    """Right click channel -> Assign EPG to this channel, with immediate refresh."""
+    try:
+        sid = str(stream_id or "").strip()
+        channel_name = str(name or sid or "Live TV Channel").strip()
+        if not sid:
+            sid = xbmcgui.Dialog().input("Live TV stream ID", type=xbmcgui.INPUT_ALPHANUM).strip()
+        if not sid:
+            notify("No channel selected", icon=xbmcgui.NOTIFICATION_ERROR)
+            return
+        if not channel_name or channel_name == sid:
+            channel_name = xbmcgui.Dialog().input("Channel name", defaultt=channel_name or sid, type=xbmcgui.INPUT_ALPHANUM).strip() or sid
+        sources = _btv_epg_source_items()
+        if not sources:
+            notify("No EPG sources enabled", icon=xbmcgui.NOTIFICATION_ERROR)
+            return
+        labels = [("⭐ " if source_id == "skygo" else "") + label for source_id, label, url in sources]
+        src_idx = xbmcgui.Dialog().select("Choose EPG source", labels)
+        if src_idx < 0:
+            notify("EPG assignment cancelled")
+            return
+        source_id, source_label, url = sources[src_idx]
+        progress = xbmcgui.DialogProgress()
+        choices: List[Tuple[str, str]] = []
+        try:
+            progress_create(progress, ADDON_NAME, f"Loading {source_label} EPG", "Downloading and reading channels...")
+            choices = xmltv_channel_choices(url, "manual_assign_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=False, progress=progress)
+            if not choices:
+                choices = xmltv_channel_choices(url, "manual_assign_" + re.sub(r"[^A-Za-z0-9_]+", "_", source_id)[:80], force_refresh=True, progress=progress)
+            try:
+                progress_update(progress, 100, "EPG loaded", f"Found {len(choices)} channels")
+                xbmc.sleep(350)
+            except Exception:
+                pass
+        finally:
+            try:
+                progress.close()
+            except Exception:
+                pass
+        if not choices:
+            xbmcgui.Dialog().ok(ADDON_NAME, f"No EPG channels found for {source_label}.\n\nTry Tools → EPG Manager → Refresh EPG Sources.")
+            return
+        target = norm_epg_key(channel_name)
+        def score(pair: Tuple[str, str]) -> Tuple[int, str]:
+            ch_id, lbl = pair
+            key = norm_epg_key(lbl)
+            if target and key == target:
+                return (0, lbl.lower())
+            if target and (target in key or key in target):
+                return (1, lbl.lower())
+            return (2, lbl.lower())
+        sorted_choices = sorted(choices, key=score)[:5000]
+        epg_labels = [label for _cid, label in sorted_choices]
+        epg_idx = xbmcgui.Dialog().select(f"Assign EPG to {channel_name}", epg_labels)
+        if epg_idx < 0:
+            notify("EPG assignment cancelled")
+            return
+        epg_id, epg_label = sorted_choices[epg_idx]
+        _btv_save_epg_assignment(source_id, epg_id, epg_label, sid, channel_name)
+        try:
+            metadata_cache_delete("live_streams", str(cat_id or ""))
+        except Exception:
+            pass
+        _btv_finish_epg_assignment(channel_name, epg_label, cat_id, "")
+    except Exception as exc:
+        log(f"manual_epg_assign v1.0.40 crashed: {exc}", xbmc.LOGERROR)
+        try:
+            xbmcgui.Dialog().ok(ADDON_NAME, f"EPG assignment failed:\n{exc}")
+        except Exception:
+            pass
+# ---- end v1.0.40 EPG assignment refresh + Kodi args fix ----
+
 def router(paramstring: str) -> None:
     params = dict(urllib.parse.parse_qsl(paramstring or ""))
     mode = params.get("mode") or "main"
@@ -4777,8 +6505,26 @@ def router(paramstring: str) -> None:
         manual_epg_manager_menu()
     elif mode == "manual_epg_sources":
         manual_epg_sources_menu()
+    elif mode == "manual_epg_live_categories":
+        manual_epg_live_categories_menu()
+    elif mode == "manual_epg_live_channels":
+        manual_epg_live_channels_menu(params.get("cat_id") or "", params.get("title") or "Live TV")
+    elif mode == "manual_epg_sources_for_channel":
+        manual_epg_sources_for_channel_menu(params.get("stream_id") or "", params.get("name") or "", params.get("cat_id") or "", params.get("title") or "")
+    elif mode == "manual_epg_source_channels_for_channel":
+        manual_epg_source_channels_for_channel_menu(params.get("source_id") or "", params.get("stream_id") or "", params.get("name") or "", params.get("cat_id") or "", params.get("title") or "")
+    elif mode == "manual_epg_assign_to_stream":
+        manual_epg_assign_to_stream(params.get("source_id") or "", params.get("channel_id") or "", params.get("channel_label") or "", params.get("stream_id") or "", params.get("name") or "", params.get("cat_id") or "", params.get("title") or "")
+    elif mode == "manual_epg_clear_channel":
+        manual_epg_clear_channel(params.get("stream_id") or "", params.get("name") or "")
     elif mode == "manual_epg_source_info":
         manual_epg_source_info(params.get("source_id") or "")
+    elif mode == "manual_epg_source_channels":
+        manual_epg_source_channels_menu(params.get("source_id") or "")
+    elif mode == "manual_epg_refresh_one_source":
+        manual_epg_refresh_one_source(params.get("source_id") or ""); xbmc.executebuiltin("Container.Refresh")
+    elif mode == "manual_epg_assign_from_source_channel":
+        manual_epg_assign_from_source_channel(params.get("source_id") or "", params.get("channel_id") or "", params.get("channel_label") or "")
     elif mode == "manual_epg_refresh_sources":
         manual_epg_refresh_sources(); xbmc.executebuiltin("Container.Refresh")
     elif mode == "manual_epg_export":
@@ -4796,7 +6542,7 @@ def router(paramstring: str) -> None:
     elif mode == "manual_epg_add_source":
         manual_epg_add_source(); xbmc.executebuiltin("Container.Refresh")
     elif mode == "manual_epg_assign":
-        manual_epg_assign(params.get("stream_id") or "", params.get("name") or "")
+        manual_epg_assign(params.get("stream_id") or "", params.get("name") or "", params.get("cat_id") or "")
     elif mode == "manual_epg_assign_prompt":
         manual_epg_assign("", "")
     elif mode == "manual_epg_clear_one":

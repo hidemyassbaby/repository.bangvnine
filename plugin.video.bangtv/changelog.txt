@@ -1,3 +1,80 @@
+v1.0.42
+- Fixed manual EPG assignment activity logging crash.
+- EPG Manager and context-menu assignment should now save, show success, and refresh folder.
+
+v1.0.40
+- Fixed EPG assignment crash from EPG Manager Assign by Category.
+- Context-menu Assign EPG now refreshes the current Live TV folder after saving.
+- EPG Manager category assignment now returns to the category channel list after saving.
+- Manual EPG mappings clear related live cache so guide data appears immediately.
+
+v1.0.39
+- EPG Manager Assign by Category now refreshes/returns to the category channel list after assigning.
+- Manual EPG assignment shows success feedback and refreshes immediately.
+- Backup and Restore now includes custom EPG sources and channel EPG mappings.
+
+v1.0.38
+- Fixed right-click Assign EPG flow.
+- Sky GO NZ downloads on demand with visible loading.
+- Selecting an EPG channel now saves, shows success, and refreshes/reopens the current Live TV folder.
+- EPG Manager assignment now passes category context through so the assigned channel view refreshes immediately.
+
+v1.0.37
+- Improved Assign EPG to this channel context-menu flow.
+- Sky GO NZ downloads on demand if not cached.
+- Shows success message and refreshes current Live TV folder after assignment.
+- Manual EPG assignment updates visible EPG data without backing out.
+
+v1.0.35
+- Fixed Sky GO NZ EPG source loading again.
+- Adds programme-channel fallback when XMLTV channel rows are missing.
+- Shows a visible loading dialog and debug info if a source still returns 0 channels.
+
+v1.0.34
+- Fixed Sky GO NZ EPG picker crash on Kodi versions with 2-argument progress dialogs.
+- Added safer corrupted cache recovery.
+- Sanitised broken Sky Sports Wikimedia SVG artwork URLs.
+
+v1.0.33
+- Fixed Sky GO NZ EPG channel browser to parse .xml.gz with streaming XML parser.
+- Added visible loading and debug details when EPG channel list is empty.
+- Forces Sky GO NZ source to https://i.mjh.nz/SkyGo/epg.xml.gz.
+
+1.0.32
+- Fixed Sky GO NZ EPG source browser for .xml.gz feeds.
+- Added visible loading dialog when opening EPG source channels.
+- Sky GO NZ now lists XMLTV channels before assignment and no longer crashes the folder.
+
+
+
+Version 1.0.31
+- Updated built-in Sky GO NZ EPG URL to https://i.mjh.nz/SkyGo/epg.xml.gz
+- Added EPG assignment by Live TV category.
+- Flow is now: EPG Manager > Assign EPG by Live TV Category > category > Bang TV channel > EPG source > EPG channel.
+- Selecting an EPG source shows a visible loading dialog while XMLTV channels are downloaded and parsed.
+- Selecting an EPG channel assigns it directly to the selected Bang TV channel.
+v1.0.30
+- Fixed Sky GO NZ EPG source opening.
+- Selecting Sky GO NZ now shows a visible loading progress dialog.
+- Downloads/parses XMLTV channel list directly from the EPG source.
+- Shows all EPG channels found so one can be selected and assigned to a Bang TV channel.
+- Added Sky GO NZ fallback URLs and faster channel-only XML parsing.
+
+[1.0.29]
+- Fixed Sky GO NZ EPG source channel browser.
+- Selecting Sky GO NZ now force-downloads/parses the XMLTV channel list and shows every channel found.
+- Added fallback XMLTV parser and i.mjh.nz mirror fallback for Kodi builds that fail on GitHub raw URLs.
+- EPG source channels are now selectable folders that open the assignment picker.
+
+v1.0.28
+- Fixed EPG Sources channel list not showing channels.
+- Sky GO NZ now opens a raw XMLTV channel picker even if normal EPG display is disabled.
+- Added source channel count row and clearer no-channel message.
+
+- Fixed EPG Sources so Sky GO NZ appears only once.
+- Clicking an EPG source now loads its XMLTV channels.
+- Selecting an EPG channel now lets you assign it to a cached Bang TV Live TV channel.
+
 v1.0.26
 - Added built-in Sky GO NZ EPG source.
 - Added EPG Sources, Refresh EPG Sources, Channel Assignments, Unassigned Channels, Missing EPG, Recently Assigned Channels, Export EPG Mappings and Import EPG Mappings.
