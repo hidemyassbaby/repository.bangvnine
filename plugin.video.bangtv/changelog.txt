@@ -1,3 +1,179 @@
+v1.0.53
+- Added SQLite cache for Movies and TV Shows category lists.
+- Added SQLite cache for Movies and TV Shows item lists so repeat opens are faster.
+- Movies and TV Shows now load from local cache first, then refresh from the server only when needed.
+- Recently Added Movies can now use the local movie database if the server or API cache is slow.
+- Kept the visible-page metadata progress bar so posters, fanart and plot are prepared before the page opens.
+- Metadata, posters, fanart, plots and item lists now work together for faster repeat browsing.
+- Updated Tools > Help with latest Live TV, EPG, Movies/TV Shows cache and Android TV performance information.
+- Improved first-time setup wording so users understand Live TV downloads first and EPG fills in after.
+- Improved stale cache fallback for Movies and TV Shows when the server is slow or unavailable.
+- Reduced repeated API calls when moving in and out of movie and TV show folders.
+- Fixed an internal forced-refresh cache handoff issue.
+- Full changelog updated.
+- No IPTV Merge code included.
+- No PVR export functionality included.
+
+v1.0.52
+- Added visible progress bar when Movies and TV Shows are preparing metadata.
+- Movies and TV Shows now prefetch metadata for the full visible page before the folder opens.
+- Current page posters, fanart, plot and info are prepared first so the page loads complete.
+- Background metadata service still handles the rest of the library without slowing browsing.
+- Improved Android TV metadata loading feedback.
+- Reduced blank poster/info rows on first open where cached metadata is available.
+- Kept cache-first behaviour and avoided unnecessary full-library metadata calls.
+
+v1.0.51
+- Added first-login Live TV preload message so users can see channels are being cached.
+- Added first-login/background EPG priming so guide data starts appearing without needing manual cache tools.
+- Live TV and EPG background maintenance now continues even if enhanced movie/series metadata is disabled.
+- Added active category EPG priming so the category currently being used gets guide data first.
+- Added a small first-page EPG safety boost when no EPG cache exists yet, while keeping Android TV browsing fast.
+- Reduced short EPG request timeout to avoid slow channel folders.
+- Added clearer notifications: Downloading Live TV channels, Live TV cached, Downloading EPG in background, and Bang TV ready.
+- Improved EPG cache reliability for channel rows.
+- Kept cache-first browsing, smart channel updates, no IPTV Merge code and no PVR export functionality.
+- Various performance and stability improvements.
+
+v1.0.50
+
+Next Generation Performance Release
+
+New Smart Engine
+- Added advanced channel fingerprint engine.
+- Added automatic stream change detection.
+- Added automatic category change detection.
+- Added automatic channel rename detection.
+- Added automatic stream URL change detection.
+- Added automatic category cache rebuilding.
+- Added automatic cache validation.
+- Added automatic database optimisation.
+
+Smart Background Services
+- Added lightweight background health checks.
+- Added adaptive update intervals based on activity.
+- Added smart long-session monitoring.
+- Added high activity mode when channel changes are detected.
+- Added low activity mode to reduce server requests.
+- Added automatic recovery after connection interruptions.
+
+Live TV Improvements
+- Added fully cache-first category loading.
+- Added fully cache-first channel browsing.
+- Added faster category opening.
+- Added faster channel opening.
+- Added improved channel sorting performance.
+- Added improved handling of large channel lists.
+- Added better channel filtering performance.
+- Added improved favourite channel loading.
+
+EPG Improvements
+- Added improved 7 day EPG cache.
+- Added missing-day EPG updates.
+- Added background EPG maintenance.
+- Added automatic EPG recovery.
+- Added EPG cache self-healing.
+- Added stale EPG fallback when servers are unavailable.
+
+Artwork Improvements
+- Added self-healing icon recovery.
+- Added self-healing logo cache.
+- Added local artwork fallback.
+- Added stronger Android TV artwork compatibility.
+- Added improved fanart fallback.
+- Added artwork cache rebuilding.
+- Added corrupted artwork recovery.
+
+Database Improvements
+- Added SQLite optimisation routines.
+- Added automatic database cleanup.
+- Added database integrity checks.
+- Added recovery from corrupted records.
+- Added safer writes.
+- Added reduced disk activity.
+- Added lower memory usage.
+- Added improved transaction handling.
+
+Smart Updates
+- Added notifications for new channels added, channels updated, channels removed, EPG updated and category changes detected.
+- Added automatic current folder refresh when changes are found.
+- Added incremental updates instead of rebuilding everything.
+- Added smarter update behaviour when returning to categories after long viewing sessions.
+- Added automatic detection of newly added channels, removed channels, renamed channels and stream URL changes.
+
+Android TV Optimisation
+- Added improved startup speed.
+- Added reduced background overhead.
+- Added lower storage usage.
+- Added lower CPU usage.
+- Added lower network traffic.
+- Added improved responsiveness.
+- Added better memory management.
+- Added faster navigation.
+- Added smoother browsing.
+
+Maintenance
+- Added automatic cache cleanup on version upgrades.
+- Added stale cache fallback.
+- Added improved recovery from server failures.
+- Added improved recovery from cache corruption.
+- Added improved background maintenance scheduling.
+- Added cleanup for old external guide export files left from older builds.
+
+Removed
+- Removed IPTV Merge dependencies.
+- Removed external PVR export functionality.
+- Removed unnecessary API requests.
+- Removed excessive cache rebuilding.
+- Removed redundant background operations.
+- Removed unnecessary external playlist refreshes.
+
+Various bug fixes and performance improvements.
+
+Version 1.0.49
+- Added SQLite-first Live TV database for faster Android TV category and channel browsing.
+- Added channel and category fingerprints so Bang TV can detect new, removed and updated streams without rebuilding everything unnecessarily.
+- Live TV folders now prefer SQLite/cache first, then refresh from the server only when needed or forced.
+- Background smart checks now save changed categories/channels into the SQLite database automatically.
+- Internal smart update records rebuild only when channel data actually changes.
+- Added incremental category database updates when only one category changes.
+- Improved long-session update behaviour so new links can appear after returning to a category later.
+- Improved stale-cache fallback when the server is slow or unavailable.
+- Improved Android TV responsiveness by reducing repeated JSON cache reads and unnecessary API calls.
+- Improved Live TV statistics foundation with saved fingerprints and local channel counts.
+- Kept 7-day local EPG/cache behaviour and cache-first browsing.
+- Kept artwork/icon self-healing and local icon fallback.
+- No IPTV Merge components or dependencies are included.
+- Various performance improvements and bug fixes.
+
+Version 1.0.48
+- Added generic smart channel-change detection for any Live TV category, not just sport.
+- Added clearer update messages: New channels added, Channels updated, Channels removed and EPG updated wording where available.
+- Background service now refreshes the current Live TV folder when changes are detected so new links can appear without manual force refresh.
+- Channel comparisons now include provider source/url fields when supplied, so changed streams are detected even if the name/logo stay the same.
+- Kept the fast cache-first Android TV behaviour, folders open from saved data while checks happen in the background.
+- Kept IPTV Merge-specific code removed/not present.
+
+Version 1.0.47
+- Super optimized Android TV browsing pass.
+- Live TV category and channel cache now lasts 7 days unless forced refresh/update is used.
+- Opening Live TV folders no longer downloads/parses XMLTV or calls short EPG per channel. It uses local 7-day guide cache only.
+- Background smart update no longer pulls the full all-channel playlist during normal checks once a full cache exists. Manual Refresh Live TV and Force Full Rebuild still force fresh server data.
+- Startup preload no longer pulls full Movies and Series lists, reducing first-run Android TV delay.
+- Added stronger Android TV artwork properties for icon/thumb/poster/banner/clearlogo fallback.
+- Network failures now fall back to stale saved cache where available instead of showing empty folders.
+- Checked for IPTV Merge-specific code and removed none because no IPTV Merge integration was present.
+
+v1.0.46
+- Added Android TV icon self-healing with a versioned local profile icon cache.
+- Added Tools > Cache > Force Icons / Refresh Logos to rebuild the local artwork fallback.
+- Increased Live TV channel cache to reduce repeated API calls while browsing.
+- Increased category cache lifetime so menus open from local data first.
+- Increased XMLTV and short EPG cache lifetime to 7 days where cached data exists.
+- Live EPG lookups now use the local cache before contacting the server.
+- Removed external guide export behaviour and kept guide features inside Bang TV.
+- Manual Refresh Live TV and Update Category still force fresh server data.
+
 1.0.44
 - Added Android TV fast browsing mode. New metadata preview fetches are capped per page and the rest are queued for the background service, reducing folder-opening delays.
 - Removed the metadata loading pop-up in fast mode so Android TV folders open with less interruption.

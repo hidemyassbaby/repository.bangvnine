@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Bang TV Kodi plugin
-Version 1.0.44
+Version 1.0.49
 Kodi 21 and Kodi 22 friendly, Python 3 only.
 """
 
@@ -16,6 +16,7 @@ import urllib.parse
 from html import unescape as html_unescape
 import gzip
 import re
+import hashlib
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -45,7 +46,7 @@ SKYGO_EPG_CATEGORY_IDS = {"317"}  # VIP | Sky Sport NZ
 NZ_USER_AGENT = "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client) libcurl/7.58.0 OpenSSL/1.0.2o zlib/1.2.11 clib/1.8.56"
 
 HEADERS = {
-    "User-Agent": "Kodi BangTV/1.0.44",
+    "User-Agent": "Kodi BangTV/1.0.49",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 }
@@ -63,15 +64,26 @@ PROFILE_PATH = xbmcvfs.translatePath(ADDON.getAddonInfo("profile")).rstrip("/\\"
 if not xbmcvfs.exists(PROFILE_PATH):
     xbmcvfs.mkdirs(PROFILE_PATH)
 
+ARTWORK_CACHE_DIR = os.path.join(PROFILE_PATH, "artwork_cache")
+try:
+    if not xbmcvfs.exists(ARTWORK_CACHE_DIR):
+        xbmcvfs.mkdirs(ARTWORK_CACHE_DIR)
+except Exception:
+    pass
+
 FAV_FILE = os.path.join(PROFILE_PATH, "favorites.json")
 CACHE_FILE = os.path.join(PROFILE_PATH, "api_cache.json")
 METADATA_DB_FILE = os.path.join(PROFILE_PATH, "metadata.db")
-CACHE_TTL_SECONDS = 10 * 60
-FAST_PREVIEW_FETCH_LIMIT = 8
+LIVE_DB_FILE = os.path.join(PROFILE_PATH, "live_cache.db")
+LIBRARY_DB_FILE = os.path.join(PROFILE_PATH, "library_cache.db")
+CACHE_TTL_SECONDS = 60 * 60
+LIVE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+LIVE_CATEGORY_TTL_SECONDS = 7 * 24 * 60 * 60
+EPG_TTL_SECONDS = 7 * 24 * 60 * 60
+FAST_PREVIEW_FETCH_LIMIT = PAGE_SIZE
 _API_CACHE_MEMORY = None
 _API_CACHE_DIRTY = False
 METADATA_TTL_SECONDS = 30 * 24 * 60 * 60
-EPG_TTL_SECONDS = 6 * 60 * 60
 PAGE_SIZE = 20
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
 def addon_icon_path() -> str:
@@ -99,6 +111,38 @@ def addon_icon_path() -> str:
 
 ADDON_ICON = addon_icon_path()
 ADDON_VERSION = ADDON.getAddonInfo("version") or "1.0.13"
+
+def cached_addon_icon_path() -> str:
+    """Give Kodi skins a stable local file that changes filename each add-on version.
+
+    Android TV can hold onto old texture records. A profile-cached icon named with
+    the add-on version forces Kodi to treat it as fresh artwork without needing
+    internet artwork or a full Kodi texture wipe.
+    """
+    try:
+        safe_version = re.sub(r"[^A-Za-z0-9_.-]+", "_", ADDON_VERSION or "current")
+        target = os.path.join(ARTWORK_CACHE_DIR, f"icon-{safe_version}.png")
+        if os.path.exists(target) or xbmcvfs.exists(target):
+            return target
+        source = ADDON_ICON
+        if source and (str(source).startswith("special://") or xbmcvfs.exists(source)):
+            try:
+                xbmcvfs.copy(source, target)
+            except Exception:
+                pass
+        elif source and os.path.exists(source):
+            try:
+                import shutil
+                shutil.copyfile(source, target)
+            except Exception:
+                pass
+        if os.path.exists(target) or xbmcvfs.exists(target):
+            return target
+    except Exception:
+        pass
+    return ADDON_ICON
+
+CACHED_ADDON_ICON = cached_addon_icon_path()
 VERSION_MARKER_FILE = os.path.join(PROFILE_PATH, "installed_version.txt")
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 PLAY_LINKS_FILE = os.path.join(PROFILE_PATH, "play_links.json")
@@ -110,8 +154,10 @@ BACKUP_FILE = os.path.join(PROFILE_PATH, "bangtv_user_backup.json")
 NOTIFICATIONS_FILE = os.path.join(PROFILE_PATH, "bangtv_notifications.json")
 ACTIVITY_LOG_FILE = os.path.join(PROFILE_PATH, "bangtv_activity_log.json")
 STATISTICS_FILE = os.path.join(PROFILE_PATH, "bangtv_statistics.json")
-PVR_EXPORT_M3U_FILE = os.path.join(PROFILE_PATH, "bangtv_pvr_channels.m3u8")
-PVR_EXPORT_INFO_FILE = os.path.join(PROFILE_PATH, "bangtv_pvr_guide_setup.txt")
+REMOVED_EXPORT_FILES = (
+    os.path.join(PROFILE_PATH, "bangtv_pvr_channels.m3u8"),
+    os.path.join(PROFILE_PATH, "bangtv_pvr_guide_setup.txt"),
+)
 MANUAL_EPG_FILE = os.path.join(PROFILE_PATH, "manual_epg_map.json")
 LIVE_AUTO_CHECK_SECONDS = 30 * 60
 LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
@@ -216,6 +262,14 @@ def full_metadata_on_browse() -> bool:
     return setting_bool("full_metadata_on_browse", False)
 
 
+def live_startup_epg_boost_count() -> int:
+    """Small blocking EPG boost for first open when the background cache is still empty."""
+    try:
+        return max(0, min(8, int(get_setting("live_startup_epg_boost", "4") or "4")))
+    except Exception:
+        return 4
+
+
 def has_saved_login() -> bool:
     return bool(get_setting("username").strip() and get_setting("password").strip())
 
@@ -242,7 +296,7 @@ def login_prompt() -> None:
     ADDON.setSetting("password", pwd)
     clear_cache()
     mark_startup_preload_pending("login")
-    notify("Login saved. Bang TV will preload channels and EPG in the background.")
+    notify("Login saved. Downloading Live TV channels now. EPG will keep filling in the background.")
     xbmc.executebuiltin("Container.Refresh")
 
 
@@ -478,7 +532,7 @@ def handle_version_update() -> None:
         if old != ADDON_VERSION:
             # New installs and upgrades can otherwise keep stale category, EPG and artwork rows.
             # Clear all generated cache, but keep login, settings, favourites and manual mappings.
-            for path in (CACHE_FILE, BACKGROUND_QUEUE_FILE, LIVE_UPDATE_STATE_FILE):
+            for path in (CACHE_FILE, BACKGROUND_QUEUE_FILE, LIVE_UPDATE_STATE_FILE) + REMOVED_EXPORT_FILES:
                 try:
                     if os.path.exists(path):
                         os.remove(path)
@@ -691,7 +745,29 @@ def build_full_metadata_cache() -> None:
     notify(f"Metadata build queued: {queued_movies} movies, {queued_series} TV shows")
     xbmc.executebuiltin("Container.Refresh")
 
+def force_icon_refresh() -> None:
+    try:
+        # Remove old versioned icon files from the add-on profile, then recreate this version's copy.
+        if os.path.isdir(ARTWORK_CACHE_DIR):
+            for name in os.listdir(ARTWORK_CACHE_DIR):
+                if name.startswith("icon-") and name.endswith(".png"):
+                    try:
+                        os.remove(os.path.join(ARTWORK_CACHE_DIR, name))
+                    except Exception:
+                        pass
+        global CACHED_ADDON_ICON
+        CACHED_ADDON_ICON = cached_addon_icon_path()
+        notify("Bang TV icon cache refreshed")
+        xbmc.executebuiltin("Container.Refresh")
+    except Exception as exc:
+        log(f"Icon refresh failed: {exc}", xbmc.LOGWARNING)
+        notify("Could not refresh icon cache", icon=xbmcgui.NOTIFICATION_ERROR)
+
+
 def cache_action(action: str) -> None:
+    if action == "icons":
+        force_icon_refresh()
+        return
     if action == "stats":
         xbmcgui.Dialog().textviewer("Bang TV Cache Statistics", cache_stats_text())
         return
@@ -731,11 +807,25 @@ def cache_action(action: str) -> None:
     notify("Unknown cache action", icon=xbmcgui.NOTIFICATION_ERROR)
 
 
-def http_get_json(url: str, timeout: int = 25, use_cache: bool = True, silent: bool = False) -> Optional[Any]:
+def api_cache_ttl_for_url(url: str, ttl: Optional[int] = None) -> int:
+    if ttl is not None:
+        return int(ttl)
+    u = str(url or "")
+    if "action=get_live_categories" in u:
+        return LIVE_CATEGORY_TTL_SECONDS
+    if "action=get_live_streams" in u:
+        return LIVE_CACHE_TTL_SECONDS
+    if "action=get_short_epg" in u or "xmltv.php" in u:
+        return EPG_TTL_SECONDS
+    return CACHE_TTL_SECONDS
+
+
+def http_get_json(url: str, timeout: int = 25, use_cache: bool = True, silent: bool = False, ttl: Optional[int] = None) -> Optional[Any]:
     cache = load_cache() if use_cache else {}
     now = int(time.time())
+    effective_ttl = api_cache_ttl_for_url(url, ttl)
     cached = cache.get(url)
-    if use_cache and isinstance(cached, dict) and now - int(cached.get("time", 0)) < CACHE_TTL_SECONDS:
+    if use_cache and isinstance(cached, dict) and now - int(cached.get("time", 0)) < effective_ttl:
         return cached.get("data")
 
     try:
@@ -758,6 +848,10 @@ def http_get_json(url: str, timeout: int = 25, use_cache: bool = True, silent: b
         if not silent:
             notify("Server returned invalid JSON", icon=xbmcgui.NOTIFICATION_ERROR)
         log(f"JSON error: {exc}", xbmc.LOGWARNING if silent else xbmc.LOGERROR)
+    # Android TV speed/safety: if the server is slow or offline, keep using the
+    # saved local response instead of blocking or returning an empty folder.
+    if use_cache and isinstance(cached, dict) and "data" in cached:
+        return cached.get("data")
     return None
 
 
@@ -788,13 +882,13 @@ def mark_live_category_opened(cat_id: str, title: str = "") -> None:
         pass
 
 
-def cached_json_is_fresh(url: str, ttl: int = CACHE_TTL_SECONDS) -> bool:
+def cached_json_is_fresh(url: str, ttl: Optional[int] = None) -> bool:
     try:
         cache = load_cache()
         cached = cache.get(url)
         if not isinstance(cached, dict):
             return False
-        return int(time.time()) - int(cached.get("time", 0)) < ttl
+        return int(time.time()) - int(cached.get("time", 0)) < api_cache_ttl_for_url(url, ttl)
     except Exception:
         return False
 
@@ -820,6 +914,7 @@ def http_get_json_with_progress(url: str, label: str, timeout: int = 25, force_r
             data = http_get_json(url, timeout=timeout, use_cache=False, silent=silent)
             if data is not None:
                 save_json_to_cache(url, data)
+            # The caller decides which cache/database table should receive the response.
         else:
             data = http_get_json(url, timeout=timeout, use_cache=True, silent=silent)
         progress.update(100, "Done")
@@ -898,6 +993,275 @@ def save_live_update_state(state: Dict[str, Any]) -> None:
         log(f"Live update state save failed: {exc}", xbmc.LOGWARNING)
 
 
+def live_db() -> sqlite3.Connection:
+    """Small SQLite cache for Live TV categories and channels.
+
+    This makes Bang TV database-first on Android TV. Folder opening can read
+    from SQLite immediately, while the JSON API cache/background service updates
+    the database only when channels change.
+    """
+    conn = sqlite3.connect(LIVE_DB_FILE, timeout=10)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+    except Exception:
+        pass
+    conn.execute("CREATE TABLE IF NOT EXISTS live_categories (category_id TEXT PRIMARY KEY, name TEXT, updated INTEGER, data TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS live_channels (stream_id TEXT PRIMARY KEY, category_id TEXT, name TEXT, signature TEXT, updated INTEGER, data TEXT)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_live_channels_category ON live_channels(category_id)")
+    conn.execute("CREATE TABLE IF NOT EXISTS live_fingerprints (scope TEXT PRIMARY KEY, fingerprint TEXT, updated INTEGER, count INTEGER)")
+    return conn
+
+
+def live_fingerprint(items: Any, category: bool = False) -> str:
+    try:
+        sigs = live_signature_map(items, category)
+        packed = json.dumps(sigs, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        return hashlib.sha256(packed.encode("utf-8")).hexdigest()
+    except Exception:
+        return ""
+
+
+def live_db_save_fingerprint(scope: str, items: Any, category: bool = False) -> None:
+    try:
+        fp = live_fingerprint(items, category)
+        count = len(items) if isinstance(items, list) else 0
+        with live_db() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO live_fingerprints(scope, fingerprint, updated, count) VALUES (?, ?, ?, ?)",
+                (scope, fp, int(time.time()), int(count)),
+            )
+    except Exception as exc:
+        log(f"Live fingerprint save failed: {exc}", xbmc.LOGWARNING)
+
+
+def live_db_get_fingerprint(scope: str) -> Dict[str, Any]:
+    try:
+        with live_db() as conn:
+            row = conn.execute("SELECT fingerprint, updated, count FROM live_fingerprints WHERE scope=?", (scope,)).fetchone()
+        if not row:
+            return {}
+        return {"fingerprint": row[0] or "", "updated": int(row[1] or 0), "count": int(row[2] or 0)}
+    except Exception:
+        return {}
+
+
+def live_db_upsert_categories(items: Any) -> None:
+    if not isinstance(items, list):
+        return
+    now = int(time.time())
+    try:
+        with live_db() as conn:
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                cid = str(item.get("category_id") or item.get("id") or "").strip()
+                if not cid:
+                    continue
+                name = str(item.get("category_name") or item.get("name") or "Live TV")
+                conn.execute(
+                    "INSERT OR REPLACE INTO live_categories(category_id, name, updated, data) VALUES (?, ?, ?, ?)",
+                    (cid, name, now, json.dumps(item, ensure_ascii=False)),
+                )
+        live_db_save_fingerprint("categories", items, True)
+    except Exception as exc:
+        log(f"Live category DB update failed: {exc}", xbmc.LOGWARNING)
+
+
+def live_db_upsert_channels(items: Any, category_id: str = "") -> None:
+    if not isinstance(items, list):
+        return
+    now = int(time.time())
+    try:
+        with live_db() as conn:
+            if category_id:
+                conn.execute("DELETE FROM live_channels WHERE category_id=?", (str(category_id),))
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                sid = live_item_id(item, False)
+                if not sid:
+                    continue
+                cid = str(item.get("category_id") or category_id or "")
+                name = str(item.get("name") or "Unknown")
+                sig = json.dumps(live_item_signature(item, False), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+                conn.execute(
+                    "INSERT OR REPLACE INTO live_channels(stream_id, category_id, name, signature, updated, data) VALUES (?, ?, ?, ?, ?, ?)",
+                    (sid, cid, name, sig, now, json.dumps(item, ensure_ascii=False)),
+                )
+        live_db_save_fingerprint(f"category:{category_id}", items, False)
+    except Exception as exc:
+        log(f"Live channel DB update failed: {exc}", xbmc.LOGWARNING)
+
+
+def live_db_load_categories() -> List[Dict[str, Any]]:
+    try:
+        with live_db() as conn:
+            rows = conn.execute("SELECT data FROM live_categories ORDER BY lower(name)").fetchall()
+        out = []
+        for (raw,) in rows:
+            try:
+                item = json.loads(raw or "{}")
+                if isinstance(item, dict):
+                    out.append(item)
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return []
+
+
+def live_db_load_channels(category_id: str = "") -> List[Dict[str, Any]]:
+    try:
+        with live_db() as conn:
+            if category_id:
+                rows = conn.execute("SELECT data FROM live_channels WHERE category_id=? ORDER BY lower(name)", (str(category_id),)).fetchall()
+            else:
+                rows = conn.execute("SELECT data FROM live_channels ORDER BY lower(name)").fetchall()
+        out = []
+        for (raw,) in rows:
+            try:
+                item = json.loads(raw or "{}")
+                if isinstance(item, dict):
+                    out.append(item)
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return []
+
+
+
+def library_db() -> sqlite3.Connection:
+    """SQLite cache for Movies and TV Shows lists.
+
+    This keeps VOD and Series folders fast after the first open. The JSON API
+    response is still respected, but Kodi can rebuild pages from local SQLite
+    when Android TV storage/network is slow or the server is unavailable.
+    """
+    conn = sqlite3.connect(LIBRARY_DB_FILE, timeout=10)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+    except Exception:
+        pass
+    conn.execute("CREATE TABLE IF NOT EXISTS library_categories (content_type TEXT, category_id TEXT, name TEXT, updated INTEGER, data TEXT, PRIMARY KEY(content_type, category_id))")
+    conn.execute("CREATE TABLE IF NOT EXISTS library_items (content_type TEXT, item_id TEXT, category_id TEXT, name TEXT, added INTEGER, updated INTEGER, data TEXT, PRIMARY KEY(content_type, item_id))")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_library_items_type_category ON library_items(content_type, category_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_library_items_type_added ON library_items(content_type, added)")
+    return conn
+
+
+def library_db_upsert_categories(content_type: str, items: Any) -> None:
+    if not isinstance(items, list):
+        return
+    now = int(time.time())
+    ctype = content_type or "vod"
+    try:
+        with library_db() as conn:
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                cid = str(item.get("category_id") or item.get("id") or "").strip()
+                if not cid:
+                    continue
+                name = str(item.get("category_name") or item.get("name") or "Unknown")
+                conn.execute(
+                    "INSERT OR REPLACE INTO library_categories(content_type, category_id, name, updated, data) VALUES (?, ?, ?, ?, ?)",
+                    (ctype, cid, name, now, json.dumps(item, ensure_ascii=False)),
+                )
+    except Exception as exc:
+        log(f"Library category DB update failed: {exc}", xbmc.LOGWARNING)
+
+
+def library_item_id(content_type: str, item: Dict[str, Any]) -> str:
+    if content_type == "series":
+        return str(item.get("series_id") or item.get("id") or "").strip()
+    return str(item.get("stream_id") or item.get("id") or "").strip()
+
+
+def library_db_upsert_items(content_type: str, items: Any, category_id: str = "") -> None:
+    if not isinstance(items, list):
+        return
+    now = int(time.time())
+    ctype = content_type or "vod"
+    try:
+        with library_db() as conn:
+            if category_id:
+                conn.execute("DELETE FROM library_items WHERE content_type=? AND category_id=?", (ctype, str(category_id)))
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                iid = library_item_id(ctype, item)
+                if not iid:
+                    continue
+                cid = str(item.get("category_id") or category_id or "")
+                name = str(item.get("name") or item.get("title") or "Unknown")
+                added = safe_int(item.get("added"))
+                conn.execute(
+                    "INSERT OR REPLACE INTO library_items(content_type, item_id, category_id, name, added, updated, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (ctype, iid, cid, name, added, now, json.dumps(item, ensure_ascii=False)),
+                )
+    except Exception as exc:
+        log(f"Library item DB update failed: {exc}", xbmc.LOGWARNING)
+
+
+def library_db_load_categories(content_type: str) -> List[Dict[str, Any]]:
+    try:
+        with library_db() as conn:
+            rows = conn.execute("SELECT data FROM library_categories WHERE content_type=? ORDER BY lower(name)", (content_type,)).fetchall()
+        out: List[Dict[str, Any]] = []
+        for (raw,) in rows:
+            try:
+                item = json.loads(raw or "{}")
+                if isinstance(item, dict):
+                    out.append(item)
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return []
+
+
+def library_db_load_items(content_type: str, category_id: str = "") -> List[Dict[str, Any]]:
+    try:
+        with library_db() as conn:
+            if category_id:
+                rows = conn.execute("SELECT data FROM library_items WHERE content_type=? AND category_id=? ORDER BY lower(name)", (content_type, str(category_id))).fetchall()
+            else:
+                rows = conn.execute("SELECT data FROM library_items WHERE content_type=? ORDER BY lower(name)", (content_type,)).fetchall()
+        out: List[Dict[str, Any]] = []
+        for (raw,) in rows:
+            try:
+                item = json.loads(raw or "{}")
+                if isinstance(item, dict):
+                    out.append(item)
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return []
+
+
+def library_db_recent_vod(limit: int = 300) -> List[Dict[str, Any]]:
+    try:
+        with library_db() as conn:
+            rows = conn.execute("SELECT data FROM library_items WHERE content_type='vod' ORDER BY added DESC, lower(name) LIMIT ?", (int(limit),)).fetchall()
+        out: List[Dict[str, Any]] = []
+        for (raw,) in rows:
+            try:
+                item = json.loads(raw or "{}")
+                if isinstance(item, dict):
+                    out.append(item)
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return []
+
+
 def live_item_id(item: Dict[str, Any], category: bool = False) -> str:
     if not isinstance(item, dict):
         return ""
@@ -919,6 +1283,9 @@ def live_item_signature(item: Dict[str, Any], category: bool = False) -> Dict[st
         "category_id": str(item.get("category_id") or ""),
         "logo": str(item.get("stream_icon") or item.get("cover") or item.get("cover_big") or ""),
         "epg_channel_id": str(item.get("epg_channel_id") or item.get("tvg_id") or ""),
+        # Include possible provider-side URL/source fields when present so stream changes
+        # are detected even when the visible channel name and logo stay the same.
+        "stream_url": str(item.get("stream_url") or item.get("url") or item.get("direct_source") or item.get("source") or ""),
     }
 
 
@@ -942,6 +1309,24 @@ def compare_live_maps(old: Dict[str, Dict[str, str]], new: Dict[str, Dict[str, s
     removed = sorted(old_ids - new_ids)
     changed = sorted([item_id for item_id in (old_ids & new_ids) if old.get(item_id) != new.get(item_id)])
     return {"added": added, "removed": removed, "changed": changed, "added_count": len(added), "removed_count": len(removed), "changed_count": len(changed)}
+
+
+def live_update_message(changes: Dict[str, Any], epg_updated: bool = False, prefix: str = "Bang TV updated") -> str:
+    added = int(changes.get("added_count", 0) or 0) if isinstance(changes, dict) else 0
+    removed = int(changes.get("removed_count", 0) or 0) if isinstance(changes, dict) else 0
+    changed = int(changes.get("changed_count", 0) or 0) if isinstance(changes, dict) else 0
+    parts = []
+    if added:
+        parts.append(f"New channels added: {added}")
+    if changed:
+        parts.append(f"Channels updated: {changed}")
+    if removed:
+        parts.append(f"Channels removed: {removed}")
+    if epg_updated:
+        parts.append("EPG updated")
+    if not parts:
+        return prefix + ": already up to date"
+    return prefix + "\n" + "\n".join("• " + p for p in parts)
 
 
 def live_stats_summary() -> Dict[str, Any]:
@@ -1018,18 +1403,27 @@ def smart_live_check(force: bool = False, show_notice: bool = False, progress: O
         if isinstance(new_categories, list):
             result["category_changes"] = compare_live_maps(live_signature_map(old_categories, True), live_signature_map(new_categories, True))
             cache[cat_url] = {"time": now, "data": new_categories}
+            live_db_upsert_categories(new_categories)
         else:
             new_categories = old_categories if isinstance(old_categories, list) else []
 
         if progress:
-            progress.update(45, "Checking latest Live TV channels...")
+            progress.update(45, "Checking only opened Live TV folders...")
+        # Super-fast mode: do not download the full all-channels playlist during normal
+        # background checks. That call can be large and causes Android TV delays.
+        # Manual Refresh Live TV / Force Full Rebuild still does the full check.
         all_streams_url = xc_api_url("player_api.php?action=get_live_streams")
         old_streams = cache.get(all_streams_url, {}).get("data") if isinstance(cache.get(all_streams_url), dict) else []
-        new_streams = http_get_json(all_streams_url, timeout=35, use_cache=False, silent=True)
+        new_streams = None
+        if force or not isinstance(old_streams, list) or not old_streams:
+            if progress:
+                progress.update(55, "Downloading full playlist because refresh was forced...")
+            new_streams = http_get_json(all_streams_url, timeout=35, use_cache=False, silent=True)
         if isinstance(new_streams, list):
             channel_changes = compare_live_maps(live_signature_map(old_streams, False), live_signature_map(new_streams, False))
             result["channel_changes"] = channel_changes
             cache[all_streams_url] = {"time": now, "data": new_streams}
+            live_db_upsert_channels(new_streams, "")
             changed_cat_ids = set()
             old_map = live_signature_map(old_streams, False)
             new_map = live_signature_map(new_streams, False)
@@ -1045,17 +1439,17 @@ def smart_live_check(force: bool = False, show_notice: bool = False, progress: O
             total_changes = int(channel_changes.get("added_count", 0)) + int(channel_changes.get("removed_count", 0)) + int(channel_changes.get("changed_count", 0))
             if total_changes >= LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD:
                 state["high_activity_until"] = now + (3 * 60 * 60)
-            # Update cached category folders for changed categories only.
             if progress:
                 progress.update(70, "Updating changed categories...")
             for index, cid in enumerate(result["changed_category_ids"][:30]):
                 _cu, streams_url = live_cache_keys_for_category(cid)
                 items = [item for item in new_streams if isinstance(item, dict) and str(item.get("category_id") or "") == str(cid)]
                 cache[streams_url] = {"time": now, "data": items}
+                live_db_upsert_channels(items, cid)
                 if progress and result["changed_category_ids"]:
                     progress.update(70 + min(20, int((index + 1) * 20 / max(1, len(result["changed_category_ids"])))), f"Updated category {index + 1} of {len(result['changed_category_ids'])}")
         else:
-            result["error"] = "Could not read latest channel list"
+            result["channel_changes"] = {"added_count": 0, "removed_count": 0, "changed_count": 0}
         save_cache(cache)
     except Exception as exc:
         result["error"] = str(exc)
@@ -1068,7 +1462,7 @@ def smart_live_check(force: bool = False, show_notice: bool = False, progress: O
         chn = result.get("channel_changes") if isinstance(result.get("channel_changes"), dict) else {}
         total = int(chn.get("added_count", 0) or 0) + int(chn.get("removed_count", 0) or 0) + int(chn.get("changed_count", 0) or 0)
         if total:
-            add_bang_notification(f"Playlist changed: +{int(chn.get('added_count', 0) or 0)}, -{int(chn.get('removed_count', 0) or 0)}, changed {int(chn.get('changed_count', 0) or 0)}", "Updates")
+            add_bang_notification(live_update_message(chn), "Updates")
     except Exception:
         pass
     if show_notice:
@@ -1077,7 +1471,7 @@ def smart_live_check(force: bool = False, show_notice: bool = False, progress: O
         removed = int(ch.get("removed_count", 0) or 0)
         changed = int(ch.get("changed_count", 0) or 0)
         if added or removed or changed:
-            notify(f"Live TV updated: +{added}, -{removed}, changed {changed}")
+            notify(live_update_message(ch))
         elif result.get("error"):
             notify("Live TV check failed, using saved list", icon=xbmcgui.NOTIFICATION_WARNING)
         else:
@@ -1188,10 +1582,15 @@ def refresh_live_category(cat_id: str, title: str = "") -> None:
             progress.update(75, "Saving latest channel list...")
             save_json_to_cache(url, data)
             if isinstance(data, list):
+                live_db_upsert_channels(data, cat_id)
+            if isinstance(data, list):
                 state = load_live_update_state()
                 state["last_check"] = int(time.time())
                 state["last_result"] = {"checked": True, "time": int(time.time()), "category_update": str(cat_id), "channel_changes": changes, "changed_category_ids": [str(cat_id)]}
                 save_live_update_state(state)
+                total = int(changes.get("added_count", 0) or 0) + int(changes.get("removed_count", 0) or 0) + int(changes.get("changed_count", 0) or 0)
+                if total:
+                    notify(live_update_message(changes, prefix=f"{label} updated"))
                 progress.update(95, f"Loaded {len(data)} channels")
             else:
                 progress.update(95, "Latest category data saved")
@@ -1578,6 +1977,26 @@ def xmltv_epg_map(epg_url: str, cache_key: str = "live_xmltv") -> Dict[str, Dict
     return result
 
 
+
+
+def cached_xmltv_epg_map(cache_key: str = "xtream_live") -> Dict[str, Dict[str, str]]:
+    """Return XMLTV Now/Next from SQLite only.
+
+    This keeps Android TV browsing instant. The background/startup preload or
+    manual Refresh EPG fills this cache, but opening a channel folder should not
+    download and parse a huge XMLTV file.
+    """
+    cached = metadata_cache_get("epg_xmltv", cache_key, ttl=EPG_TTL_SECONDS)
+    return cached if isinstance(cached, dict) else {}
+
+
+def live_epg_cached_only(stream_id: Any) -> Dict[str, str]:
+    """Return short EPG only when it already exists locally."""
+    if not stream_id or not setting_bool("show_epg", True):
+        return {}
+    cached = metadata_cache_get("epg", stream_id, ttl=EPG_TTL_SECONDS)
+    return cached if isinstance(cached, dict) else {}
+
 def live_item_epg_from_map(item: Dict[str, Any], epg_map: Dict[str, Dict[str, str]]) -> Dict[str, str]:
     manual = manual_epg_now_next(item)
     if manual:
@@ -1800,7 +2219,7 @@ def safe_int(value: Any, default: int = 0) -> int:
 def set_art(li: xbmcgui.ListItem, thumb: str = "", fanart: str = "") -> None:
     thumb = safe_image_url(thumb) if thumb else ""
     fanart = safe_image_url(fanart) if fanart else ""
-    fallback = ADDON_ICON
+    fallback = CACHED_ADDON_ICON or ADDON_ICON
     image = thumb or fallback
     art = {
         "icon": image,
@@ -1818,6 +2237,9 @@ def set_art(li: xbmcgui.ListItem, thumb: str = "", fanart: str = "") -> None:
     try:
         li.setProperty("icon", image)
         li.setProperty("thumb", image)
+        li.setProperty("poster", image)
+        li.setProperty("banner", image)
+        li.setProperty("clearlogo", fallback)
         li.setProperty("fanart_image", art.get("fanart") or fallback)
     except Exception:
         pass
@@ -3268,7 +3690,10 @@ def batch_preview_metadata(content_type: str, ids: List[Any], limit: int = PAGE_
     if not ids or not preview_metadata_on_browse() or full_metadata_on_browse():
         return {}
     ids = [i for i in ids if i not in (None, "")][:limit]
-    fetch_limit = FAST_PREVIEW_FETCH_LIMIT if setting_bool("android_tv_fast_mode", True) else limit
+    # v1.0.52: prefetch the whole visible page before Kodi displays Movies/TV Shows.
+    # This keeps Android TV fast because only the current page is prepared, while
+    # the rest of the library stays queued for the background metadata worker.
+    fetch_limit = min(limit, FAST_PREVIEW_FETCH_LIMIT)
     results: Dict[str, Dict[str, Any]] = {}
     missing: List[Any] = []
     for item_id in ids:
@@ -3284,12 +3709,13 @@ def batch_preview_metadata(content_type: str, ids: List[Any], limit: int = PAGE_
         enqueue_background_metadata(content_type, missing[fetch_limit:], priority=False)
         missing = missing[:fetch_limit]
 
-    fast_mode = setting_bool("android_tv_fast_mode", True)
     label = "movies" if content_type == "vod" else "TV shows" if content_type == "series" else "episodes"
-    progress = None if fast_mode else xbmcgui.DialogProgress()
+    progress = xbmcgui.DialogProgress()
     try:
-        if progress:
-            progress.create(ADDON_NAME, f"Loading {label} metadata...")
+        try:
+            progress.create(ADDON_NAME, f"Preparing {label} page...", "Getting metadata for visible items")
+        except TypeError:
+            progress.create(ADDON_NAME, f"Preparing {label} page...")
         total = len(missing)
         for index, item_id in enumerate(missing, start=1):
             if progress and progress.iscanceled():
@@ -3297,7 +3723,10 @@ def batch_preview_metadata(content_type: str, ids: List[Any], limit: int = PAGE_
                 break
             if progress:
                 percent = int((index - 1) * 100 / max(total, 1))
-                progress.update(percent, f"Loading {label} metadata, item {index} of {total}")
+                try:
+                    progress.update(percent, f"Getting {label} metadata", f"Item {index} of {total}")
+                except TypeError:
+                    progress.update(percent, f"Getting {label} metadata, item {index} of {total}")
             try:
                 if content_type == "vod":
                     meta = vod_info_xtream_only(item_id)
@@ -3313,7 +3742,10 @@ def batch_preview_metadata(content_type: str, ids: List[Any], limit: int = PAGE_
                 log(f"Preview metadata failed for {content_type} {item_id}: {exc}", xbmc.LOGWARNING)
                 enqueue_background_metadata(content_type, [item_id], priority=True)
         if progress:
-            progress.update(100, f"Loading {label} metadata, done")
+            try:
+                progress.update(100, "Metadata ready", f"Prepared {len(results)} {label} items")
+            except TypeError:
+                progress.update(100, f"Metadata ready for {label}")
     finally:
         try:
             if progress:
@@ -3356,7 +3788,7 @@ def live_epg(stream_id: Any) -> Dict[str, str]:
     cached = metadata_cache_get("epg", stream_id, ttl=EPG_TTL_SECONDS)
     if cached:
         return cached
-    data = http_get_json(xc_api_url(f"player_api.php?action=get_short_epg&stream_id={quote(stream_id)}&limit=2"), timeout=5, use_cache=False, silent=True)
+    data = http_get_json(xc_api_url(f"player_api.php?action=get_short_epg&stream_id={quote(stream_id)}&limit=2"), timeout=3, use_cache=True, silent=True, ttl=EPG_TTL_SECONDS)
     if not isinstance(data, dict):
         return {}
     listings = data.get("epg_listings") or []
@@ -3397,7 +3829,7 @@ def live_epg(stream_id: Any) -> Dict[str, str]:
 
 
 def logout() -> None:
-    if not xbmcgui.Dialog().yesno(ADDON_NAME, "Log out and clear the saved IPTV username and password?"):
+    if not xbmcgui.Dialog().yesno(ADDON_NAME, "Log out and clear the saved Bang TV username and password?"):
         return
     ADDON.setSetting("username", "")
     ADDON.setSetting("password", "")
@@ -3599,84 +4031,19 @@ def guide_now_next_text(rows: List[Dict[str, Any]]) -> str:
 
 
 
-def m3u_escape(value: Any) -> str:
-    return str(value or "").replace('"', "'").replace("\n", " ").strip()
-
-
-def export_native_pvr_files(show_dialog: bool = True) -> bool:
-    """Export a local M3U playlist and XMLTV setup note for Kodi IPTV Simple PVR."""
-    if not has_saved_login():
-        notify("Login needed first", icon=xbmcgui.NOTIFICATION_ERROR)
-        return False
-    progress = xbmcgui.DialogProgress()
-    if show_dialog:
-        progress.create("Bang TV Native Guide", "Preparing PVR-style TV guide files...")
-    try:
-        if show_dialog:
-            progress.update(10, "Loading Live TV categories...")
-        cats = http_get_json(xc_api_url("player_api.php?action=get_live_categories"), timeout=25, use_cache=False)
-        cat_names: Dict[str, str] = {}
-        if isinstance(cats, list):
-            for cat in cats:
-                cat_id = str(cat.get("category_id") or "")
-                cat_names[cat_id] = str(cat.get("category_name") or "Live TV")
-        if show_dialog:
-            progress.update(35, "Loading latest Live TV channels...")
-        streams = http_get_json(xc_api_url("player_api.php?action=get_live_streams"), timeout=45, use_cache=False)
-        if not isinstance(streams, list) or not streams:
-            if show_dialog:
-                progress.close()
-            notify("No Live TV channels found", icon=xbmcgui.NOTIFICATION_ERROR)
-            return False
-        user, pwd, _label = get_effective_creds()
-        total = max(1, len(streams))
-        lines = ["#EXTM3U x-tvg-url=\"{}\"".format(m3u_escape(xtream_xmltv_url()))]
-        for idx, item in enumerate(streams):
-            if show_dialog and idx % 250 == 0:
-                progress.update(35 + int((idx / total) * 55), f"Writing channel {idx + 1} of {total}...")
-            stream_id = item.get("stream_id")
-            if stream_id is None:
-                continue
-            name = m3u_escape(item.get("name") or "Unknown")
-            logo = m3u_escape(item.get("stream_icon") or "")
-            cat_id = str(item.get("category_id") or "")
-            group = m3u_escape(cat_names.get(cat_id) or cat_id or "Live TV")
-            tvg_id = m3u_escape(item.get("epg_channel_id") or item.get("tv_archive_id") or stream_id)
-            url = f"{SERVER}/live/{quote(user)}/{quote(pwd)}/{stream_id}.ts"
-            lines.append(f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{name}" tvg-logo="{logo}" group-title="{group}",{name}')
-            lines.append(url)
-        os.makedirs(PROFILE_PATH, exist_ok=True)
-        with open(PVR_EXPORT_M3U_FILE, "w", encoding="utf-8") as fh:
-            fh.write("\n".join(lines) + "\n")
-        info = [
-            "Bang TV Native PVR Guide Setup",
-            "",
-            "Use these with IPTV Simple Client if you want the real Kodi PVR grid guide:",
-            "",
-            "M3U playlist:",
-            PVR_EXPORT_M3U_FILE,
-            "",
-            "XMLTV guide URL:",
-            xtream_xmltv_url(),
-            "",
-            "After setting IPTV Simple Client, restart Kodi or reload PVR data, then open TV Guide again.",
-        ]
-        with open(PVR_EXPORT_INFO_FILE, "w", encoding="utf-8") as fh:
-            fh.write("\n".join(info))
-        if show_dialog:
-            progress.update(100, "Done")
-            progress.close()
-            xbmcgui.Dialog().ok("Bang TV Native Guide", "Kodi's real PVR guide needs IPTV Simple Client.\n\nBang TV exported the files for it.\n\nM3U:\n{}\n\nXMLTV URL:\n{}\n\nAfter IPTV Simple is set up, this TV Guide button will open Kodi's native PVR guide.".format(PVR_EXPORT_M3U_FILE, xtream_xmltv_url()))
-        return True
-    except Exception as exc:
+def remove_disabled_export_files(show_notice: bool = False) -> bool:
+    """Remove old external guide export files. Bang TV now keeps TV Guide inside the add-on only."""
+    removed = 0
+    for path in REMOVED_EXPORT_FILES:
         try:
-            if show_dialog:
-                progress.close()
-        except Exception:
-            pass
-        log(f"PVR export failed: {exc}", xbmc.LOGERROR)
-        notify("Native guide export failed", icon=xbmcgui.NOTIFICATION_ERROR)
-        return False
+            if os.path.exists(path):
+                os.remove(path)
+                removed += 1
+        except Exception as exc:
+            log(f"Could not remove old export file {path}: {exc}", xbmc.LOGWARNING)
+    if show_notice:
+        notify("Old PVR/IPTV export files removed" if removed else "No PVR/IPTV export files found")
+    return True
 
 
 def open_native_tv_guide() -> None:
@@ -3760,7 +4127,7 @@ def guide_font(name: str = 'font12') -> str:
     return name or 'font12'
 
 class BangTVGuideWindow(xbmcgui.WindowDialog):
-    """A TiviMate/PVR-style visual guide rendered inside the add-on.
+    """A TiviMate-style visual guide rendered inside the add-on.
 
     v1.0.17 changes the guide from a full redraw model to persistent controls.
     Moving up/down or left/right now updates existing labels and the selected
@@ -4201,7 +4568,7 @@ def list_tv_guide_categories() -> None:
 
 
 def tv_guide_grid_label(channel_name: str, rows: List[Dict[str, Any]]) -> str:
-    """Build a PVR/TiviMate-inspired row label that stays inside Kodi plugin lists."""
+    """Build a TiviMate-inspired row label that stays inside Kodi plugin lists."""
     now = int(time.time())
     upcoming = []
     for row in rows or []:
@@ -4376,7 +4743,32 @@ def list_categories(action: str, next_mode: str, title: str) -> None:
     url = xc_api_url(f"player_api.php?action={action}")
     if action == "get_live_categories":
         maybe_start_live_background_check()
-        data = http_get_json_with_progress(url, "Loading Live TV categories...", timeout=25)
+        # SQLite-first: open saved categories instantly when available. The
+        # background checker keeps them fresh and only calls the API when due.
+        data = get_cached_json_any_age(url) or live_db_load_categories()
+        if not isinstance(data, list) or not data:
+            data = http_get_json_with_progress(url, "Loading Live TV categories...", timeout=25)
+        if isinstance(data, list):
+            live_db_upsert_categories(data)
+    elif action == "get_vod_categories":
+        data = get_cached_json_any_age(url) or library_db_load_categories("vod")
+        if not isinstance(data, list) or not data:
+            data = http_get_json_with_progress(url, "Loading Movie categories...", timeout=25)
+        if isinstance(data, list):
+            library_db_upsert_categories("vod", data)
+    elif action == "get_series_categories":
+        data = get_cached_json_any_age(url) or library_db_load_categories("series")
+        if not isinstance(data, list) or not data:
+            data = http_get_json_with_progress(url, "Loading TV Show categories...", timeout=25)
+        if isinstance(data, list):
+            library_db_upsert_categories("series", data)
+    elif content_type in ("vod", "series"):
+        data = get_cached_json_any_age(url) or library_db_load_items(content_type, cat_id)
+        if not isinstance(data, list) or not data:
+            label = "Loading Movies..." if content_type == "vod" else "Loading TV Shows..."
+            data = http_get_json_with_progress(url, label, timeout=30)
+        if isinstance(data, list) and data:
+            library_db_upsert_items(content_type, data, cat_id)
     else:
         data = http_get_json(url)
     if not isinstance(data, list) or not data:
@@ -4430,9 +4822,11 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
         # For Live TV categories, show saved channels immediately even when the cache is old.
         # The background service refreshes and compares the folder after opening/after playback,
         # so returning from a long watch can show newly added streams without blocking the UI.
-        data = get_cached_json_any_age(url)
-        if data is None:
+        data = get_cached_json_any_age(url) or live_db_load_channels(cat_id)
+        if data is None or not isinstance(data, list) or not data:
             data = http_get_json_with_progress(url, "Loading Live TV channels...", timeout=25, force_refresh=True)
+        if isinstance(data, list) and data:
+            live_db_upsert_channels(data, cat_id)
     else:
         data = http_get_json(url)
     if not isinstance(data, list) or not data:
@@ -4450,9 +4844,13 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
     elif content_type == "series":
         preview_meta = batch_preview_metadata("series", [item.get("series_id") for item in items], PAGE_SIZE)
     elif content_type == "live":
-        live_xmltv_epg = xmltv_epg_map(xtream_xmltv_url(), "xtream_live")
+        # Use cached 7-day XMLTV only. Do not download/parse XMLTV while opening folders.
+        live_xmltv_epg = cached_xmltv_epg_map("xtream_live")
+        if not live_xmltv_epg and page == 1:
+            notify("EPG is still downloading in the background")
 
     user, pwd, _label = get_effective_creds()
+    live_boost_remaining = live_startup_epg_boost_count() if content_type == "live" and page == 1 and not live_xmltv_epg else 0
     for item in items:
         name = item.get("name") or "Unknown"
         icon = item.get("stream_icon") or item.get("cover") or item.get("cover_big") or ""
@@ -4464,7 +4862,12 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
                 continue
             # Prefer the same XMLTV Now/Next method used by New Zealand Streams because it works
             # consistently in more Kodi skins/themes. Fall back to Xtream short EPG if XMLTV has no match.
-            epg = live_item_epg_from_map(item, live_xmltv_epg) or live_epg(stream_id)
+            epg = live_item_epg_from_map(item, live_xmltv_epg) or live_epg_cached_only(stream_id)
+            # First-login safety net: if the background EPG cache is empty, fetch only a few
+            # visible channel rows so EPG starts appearing without making Android TV sluggish.
+            if not epg and live_boost_remaining > 0:
+                epg = live_epg(stream_id)
+                live_boost_remaining -= 1
             live_meta = dict(item)
             live_meta["plot"] = epg.get("plot") or plot
             live_meta["mediatype"] = "video"
@@ -4515,7 +4918,12 @@ def list_streams(content_type: str, cat_id: str = "", title: str = "", page: int
 def list_recent_vod(page: int = 1) -> None:
     xbmcplugin.setPluginCategory(HANDLE, "Recently Added Movies")
     xbmcplugin.setContent(HANDLE, "movies")
-    data = http_get_json(xc_api_url("player_api.php?action=get_vod_streams"))
+    recent_url = xc_api_url("player_api.php?action=get_vod_streams")
+    data = get_cached_json_any_age(recent_url) or library_db_recent_vod(300)
+    if not isinstance(data, list) or not data:
+        data = http_get_json_with_progress(recent_url, "Loading Recently Added Movies...", timeout=30)
+    if isinstance(data, list) and data:
+        library_db_upsert_items("vod", data, "")
     if not isinstance(data, list):
         data = []
     user, pwd, _label = get_effective_creds()
@@ -5229,17 +5637,18 @@ def help_menu() -> None:
     add_action("Live TV Updates", "live_help")
     add_action("High Activity Mode", "live_help")
     add_action("Stream Health", "help_topic", {"topic": "health"})
-    add_action("TV Guide", "help_topic", {"topic": "guide"})
+    add_action("TV Guide / EPG", "help_topic", {"topic": "guide"})
+    add_action("Movies and TV Shows Cache", "help_topic", {"topic": "faq"})
     add_action("FAQ", "help_topic", {"topic": "faq"})
     xbmcplugin.endOfDirectory(HANDLE)
 
 
 def help_topic(topic: str) -> None:
     texts = {
-        "setup": "First Time Setup\n\nOpen Settings, enter your username and password, then use Test Connection. Open Live TV once to build the first cache.",
-        "health": "Stream Health\n\nBang TV records when streams play successfully or fail. This helps mark channels as healthy, slow, or failing.",
-        "guide": "TV Guide\n\nThe guide uses skin-safe Kodi lists for reliability. The experimental visual grid may not work on every skin, so the stable guide is the safest option.",
-        "faq": "FAQ\n\nIf Live TV feels slow, open the category once, then it should cache. Use Refresh Live TV for fresh data, or Update Category from a category context menu.",
+        "setup": "First Time Setup\n\nOpen Settings, enter your username and password, then use Test Connection. On first login Bang TV downloads Live TV channels first, then starts EPG and artwork work in the background so browsing stays usable. Open Movies and TV Shows once to build their local SQLite list cache. After that, folders should open much faster.",
+        "health": "Stream Health\n\nBang TV records when streams play successfully or fail. This helps mark channels as healthy, slow, or failing. Health data stays local and is used to help you spot problem streams.",
+        "guide": "TV Guide / EPG\n\nBang TV keeps EPG data local where possible. Live TV opens from cache first, then EPG fills in from local XMLTV or short EPG cache. If guide rows are missing at first login, leave Kodi open briefly or open the category again so the background EPG worker can finish.",
+        "faq": "FAQ\n\nLive TV, Movies and TV Shows are cache-first. Movies and TV Shows now save their category and item lists into SQLite, while metadata is cached separately. The first open may show a metadata progress bar, but the next open should be faster. Use Refresh Live TV or Update Category only when you want to force fresh Live TV data.",
     }
     xbmcgui.Dialog().textviewer("Bang TV Help", texts.get(topic, "Help not found."))
 
@@ -5257,12 +5666,12 @@ def tools_menu() -> None:
     add_folder("Upcoming Sports", "upcoming_sports", plot="Finds possible upcoming sport from cached EPG data.")
     add_folder("Backup & Restore", "backup_restore", plot="Create or restore backups from a folder, USB, NAS or selected ZIP file.")
     add_folder("Advanced Settings", "advanced_settings", plot="Smart update, cache, metadata and EPG settings/help.")
-    add_folder("Help", "help_menu", plot="First time setup, Live TV updates, High Activity Mode, Stream Health, TV Guide and FAQ.")
+    add_folder("Help", "help_menu", plot="First time setup, Live TV cache, Movies/TV Shows metadata cache, EPG, Android TV performance and FAQ.")
     add_action("Account status", "account_status", plot="Shows your IPTV account status, expiry date and connection limits.")
     add_action("Test connection", "connection_test", plot="Checks that Bang TV can connect to the Xtream Codes server with your saved login.")
     add_folder("Cache", "cache_menu", plot="View cache size, clear cached metadata, clear EPG data, and rebuild Bang TV databases.")
     add_action("Settings", "open_settings", plot="Open Bang TV settings for login, metadata, preview and add-on options.")
-    add_action("Logout", "logout", plot="Logs out of Bang TV and removes your saved IPTV username and password.")
+    add_action("Logout", "logout", plot="Logs out of Bang TV and removes your saved Bang TV username and password.")
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -5318,12 +5727,17 @@ Recently Watched keeps your last 50 Live TV channels so you can jump back quickl
 Scheduled refresh
 
 The background service checks Live TV roughly every 30 minutes while Live TV is being used, every 10 minutes in High Activity Mode, and backs off when you are not using Live TV. The manual Refresh Live TV and Update Category buttons still force an immediate update.
+
+Movies and TV Shows
+
+Movies and TV Shows now save their category and item lists into a local SQLite database. The first open may show a progress bar while Bang TV prepares metadata for the visible page. After that, posters, fanart, plots and list data are read from the local cache first, then refreshed only when needed. This keeps Android TV browsing faster and reduces repeated API calls.
 """
     xbmcgui.Dialog().textviewer("Live TV Help", text)
 
 def cache_menu() -> None:
     xbmcplugin.setPluginCategory(HANDLE, "Tools / Cache")
     add_action("Cache statistics", "cache_action", {"action": "stats"}, plot="Shows the current size of the Bang TV API and SQLite metadata cache.")
+    add_action("Force Icons / Refresh Logos", "cache_action", {"action": "icons"}, plot="Rebuilds the versioned local artwork fallback used by Android TV skins.")
     add_action("Build full metadata cache", "cache_action", {"action": "build_full"}, plot="Queues all Movies, TV Shows, seasons and episodes for background metadata caching. This can take a while, but browsing stays usable.")
     add_action("Clear metadata cache", "cache_action", {"action": "metadata"}, plot="Clears cached movie, TV show and episode descriptions, cast, genre, fanart and ratings.")
     add_action("Clear artwork cache", "cache_action", {"action": "artwork"}, plot="Clears cached poster and fanart records. Artwork will be refreshed when needed.")
@@ -5339,14 +5753,14 @@ def main_menu() -> None:
     xbmcplugin.setPluginCategory(HANDLE, ADDON_NAME)
     xbmcplugin.setContent(HANDLE, "videos")
     if not has_saved_login():
-        add_action("Login", "login", plot="Enter your Bang TV IPTV username and password to unlock Live TV, Movies and Series.")
+        add_action("Login", "login", plot="Enter your Bang TV username and password to unlock Live TV, Movies and Series.")
         add_action("Settings", "open_settings", plot="Open Bang TV settings for login, metadata, EPG and background service options.")
         xbmcplugin.endOfDirectory(HANDLE)
         return
     if setting_bool("show_account_status", True):
         _user, _pwd, label = get_effective_creds()
         add_action(f"Account: {label}", "account_status", plot="Shows your IPTV account status, expiry date and connection limits.")
-    add_folder("Live TV", "live_categories", plot="Browse live IPTV channels with channel logos and Xtream EPG information.")
+    add_folder("Live TV", "live_categories", plot="Browse live channels with channel logos and Xtream EPG information.")
     add_folder("TV Guide", "tv_guide", plot="Open the skin-safe Bang TV guide that works across Kodi skins. Uses normal Kodi folder controls with Channel | Now | Next | Later rows.")
     add_folder("Recently Watched", "recent_live", plot="Quickly reopen your recent Live TV channels.")
     add_folder("Movies", "vod_categories", plot="Browse movie categories, recently added movies, posters, descriptions, ratings and trailers.")
@@ -5354,7 +5768,7 @@ def main_menu() -> None:
     add_folder("Search", "search", plot="Search across Bang TV Movies, TV Shows and Live TV channels.")
     add_folder("Favourites", "favourites", plot="Open your saved Bang TV favourite movies, shows and channels.")
     add_folder("Tools", "tools", plot="Account tools, cache controls, connection test, settings and maintenance options.")
-    add_action("Logout", "logout", plot="Logs out of Bang TV and removes your saved IPTV username and password.")
+    add_action("Logout", "logout", plot="Logs out of Bang TV and removes your saved Bang TV username and password.")
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -5396,7 +5810,7 @@ def _btv_download_xmltv_source(url: str, progress: Any = None) -> Tuple[bytes, s
                 except Exception:
                     pass
             headers = {
-                "User-Agent": "Kodi BangTV/1.0.44",
+                "User-Agent": "Kodi BangTV/1.0.49",
                 "Accept": "application/xml,text/xml,*/*",
             }
             response = SESSION.get(candidate, timeout=90, headers=headers)
@@ -6697,7 +7111,7 @@ def router(paramstring: str) -> None:
     elif mode == "live_dashboard":
         live_dashboard()
     elif mode == "setup_native_pvr_guide":
-        export_native_pvr_files(show_dialog=True)
+        remove_disabled_export_files(show_notice=True)
     elif mode == "native_tv_guide":
         list_tv_guide_categories()
     elif mode == "auto_cleanup":

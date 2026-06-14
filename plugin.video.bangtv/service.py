@@ -11,10 +11,12 @@ import os
 import sqlite3
 import time
 import urllib.parse
+import hashlib
 from typing import Any, Dict, List, Tuple
 
 import xbmc
 import xbmcaddon
+import xbmcgui
 import xbmcvfs
 import requests
 
@@ -27,6 +29,7 @@ if not xbmcvfs.exists(PROFILE_PATH):
     xbmcvfs.mkdirs(PROFILE_PATH)
 
 METADATA_DB_FILE = os.path.join(PROFILE_PATH, "metadata.db")
+LIVE_DB_FILE = os.path.join(PROFILE_PATH, "live_cache.db")
 BACKGROUND_QUEUE_FILE = os.path.join(PROFILE_PATH, "metadata_queue.json")
 METADATA_TTL_SECONDS = 30 * 24 * 60 * 60
 REQUEST_TIMEOUT = 6
@@ -35,13 +38,18 @@ RATE_SLEEP = 0.35
 MAX_PER_CYCLE = 45
 STARTUP_PRELOAD_FILE = os.path.join(PROFILE_PATH, "startup_preload.json")
 CACHE_FILE = os.path.join(PROFILE_PATH, "api_cache.json")
-CACHE_TTL_SECONDS = 10 * 60
+CACHE_TTL_SECONDS = 60 * 60
+LIVE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+LIVE_CATEGORY_TTL_SECONDS = 7 * 24 * 60 * 60
+EPG_TTL_SECONDS = 7 * 24 * 60 * 60
 LIVE_UPDATE_STATE_FILE = os.path.join(PROFILE_PATH, "live_update_state.json")
 LIVE_AUTO_CHECK_SECONDS = 30 * 60
 LIVE_HIGH_ACTIVITY_SECONDS = 10 * 60
 LIVE_HIGH_ACTIVITY_CHANGE_THRESHOLD = 20
 LIVE_ACTIVE_CATEGORY_CHECK_SECONDS = 10 * 60
 LIVE_RECENT_CATEGORY_CHECK_SECONDS = 30 * 60
+STARTUP_EPG_PRIME_LIMIT = 160
+ACTIVE_CATEGORY_EPG_PRIME_LIMIT = 60
 
 SESSION = requests.Session()
 try:
@@ -51,7 +59,7 @@ try:
 except Exception:
     pass
 SESSION.headers.update({
-    "User-Agent": "Kodi BangTV/1.0.44 background-service",
+    "User-Agent": "Kodi BangTV/1.0.51 background-service",
     "Accept": "application/json,text/plain,*/*",
     "Connection": "keep-alive",
 })
@@ -59,6 +67,13 @@ SESSION.headers.update({
 
 def log(message: str, level: int = xbmc.LOGINFO) -> None:
     xbmc.log(f"[{ADDON_ID} service] {message}", level)
+
+
+def notify(message: str, heading: str = ADDON_NAME, icon: str = xbmcgui.NOTIFICATION_INFO) -> None:
+    try:
+        xbmcgui.Dialog().notification(heading, message, icon, 5000, sound=False)
+    except Exception:
+        pass
 
 
 def setting_bool(key: str, default: bool = False) -> bool:
@@ -226,6 +241,82 @@ def save_live_state(state: Dict[str, Any]) -> None:
         log(f"live state save failed: {exc}", xbmc.LOGWARNING)
 
 
+def live_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(LIVE_DB_FILE, timeout=10)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+    except Exception:
+        pass
+    conn.execute("CREATE TABLE IF NOT EXISTS live_categories (category_id TEXT PRIMARY KEY, name TEXT, updated INTEGER, data TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS live_channels (stream_id TEXT PRIMARY KEY, category_id TEXT, name TEXT, signature TEXT, updated INTEGER, data TEXT)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_live_channels_category ON live_channels(category_id)")
+    conn.execute("CREATE TABLE IF NOT EXISTS live_fingerprints (scope TEXT PRIMARY KEY, fingerprint TEXT, updated INTEGER, count INTEGER)")
+    return conn
+
+
+def live_fingerprint(items: Any, category: bool = False) -> str:
+    try:
+        sigs = live_signature_map(items, category)
+        packed = json.dumps(sigs, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        return hashlib.sha256(packed.encode("utf-8")).hexdigest()
+    except Exception:
+        return ""
+
+
+def live_db_save_fingerprint(scope: str, items: Any, category: bool = False) -> None:
+    try:
+        fp = live_fingerprint(items, category)
+        count = len(items) if isinstance(items, list) else 0
+        with live_db() as conn:
+            conn.execute("INSERT OR REPLACE INTO live_fingerprints(scope, fingerprint, updated, count) VALUES (?, ?, ?, ?)", (scope, fp, int(time.time()), int(count)))
+    except Exception as exc:
+        log(f"Live fingerprint DB save failed: {exc}", xbmc.LOGWARNING)
+
+
+def live_db_upsert_categories(items: Any) -> None:
+    if not isinstance(items, list):
+        return
+    now = int(time.time())
+    try:
+        with live_db() as conn:
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                cid = str(item.get("category_id") or item.get("id") or "").strip()
+                if not cid:
+                    continue
+                name = str(item.get("category_name") or item.get("name") or "Live TV")
+                conn.execute("INSERT OR REPLACE INTO live_categories(category_id, name, updated, data) VALUES (?, ?, ?, ?)", (cid, name, now, json.dumps(item, ensure_ascii=False)))
+        live_db_save_fingerprint("categories", items, True)
+    except Exception as exc:
+        log(f"Live category DB update failed: {exc}", xbmc.LOGWARNING)
+
+
+def live_db_upsert_channels(items: Any, category_id: str = "") -> None:
+    if not isinstance(items, list):
+        return
+    now = int(time.time())
+    try:
+        with live_db() as conn:
+            if category_id:
+                conn.execute("DELETE FROM live_channels WHERE category_id=?", (str(category_id),))
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                sid = live_item_id(item, False)
+                if not sid:
+                    continue
+                cid = str(item.get("category_id") or category_id or "")
+                name = str(item.get("name") or "Unknown")
+                sig = json.dumps(live_item_signature(item, False), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+                conn.execute("INSERT OR REPLACE INTO live_channels(stream_id, category_id, name, signature, updated, data) VALUES (?, ?, ?, ?, ?, ?)", (sid, cid, name, sig, now, json.dumps(item, ensure_ascii=False)))
+        live_db_save_fingerprint(f"category:{category_id}", items, False)
+    except Exception as exc:
+        log(f"Live channel DB update failed: {exc}", xbmc.LOGWARNING)
+
+
 def live_cache_keys_for_category(cat_id: str) -> Tuple[str, str]:
     cat_url = xc_api_url("player_api.php?action=get_live_categories")
     streams_url = xc_api_url(f"player_api.php?action=get_live_streams&category_id={quote(cat_id)}")
@@ -250,6 +341,7 @@ def live_item_signature(item: Dict[str, Any], category: bool = False) -> Dict[st
         "category_id": str(item.get("category_id") or ""),
         "logo": str(item.get("stream_icon") or item.get("cover") or item.get("cover_big") or ""),
         "epg_channel_id": str(item.get("epg_channel_id") or item.get("tvg_id") or ""),
+        "stream_url": str(item.get("stream_url") or item.get("url") or item.get("direct_source") or item.get("source") or ""),
     }
 
 
@@ -275,6 +367,24 @@ def compare_live_maps(old: Dict[str, Dict[str, str]], new: Dict[str, Dict[str, s
     return {"added": added, "removed": removed, "changed": changed, "added_count": len(added), "removed_count": len(removed), "changed_count": len(changed)}
 
 
+def live_update_message(changes: Dict[str, Any], epg_updated: bool = False, prefix: str = "Bang TV updated") -> str:
+    added = int(changes.get("added_count", 0) or 0) if isinstance(changes, dict) else 0
+    removed = int(changes.get("removed_count", 0) or 0) if isinstance(changes, dict) else 0
+    changed = int(changes.get("changed_count", 0) or 0) if isinstance(changes, dict) else 0
+    parts = []
+    if added:
+        parts.append(f"New channels added: {added}")
+    if changed:
+        parts.append(f"Channels updated: {changed}")
+    if removed:
+        parts.append(f"Channels removed: {removed}")
+    if epg_updated:
+        parts.append("EPG updated")
+    if not parts:
+        return prefix + ": already up to date"
+    return prefix + ": " + ", ".join(parts)
+
+
 def refresh_live_category_background(cat_id: str, title: str, state: Dict[str, Any], cache: Dict[str, Any], force: bool = False) -> Dict[str, Any]:
     now = int(time.time())
     cid = str(cat_id or "")
@@ -295,6 +405,8 @@ def refresh_live_category_background(cat_id: str, title: str, state: Dict[str, A
         return {"checked": True, "time": now, "category_id": cid, "error": "Could not read latest category channels"}
     changes = compare_live_maps(live_signature_map(old_items, False), live_signature_map(new_items, False))
     cache[streams_url] = {"time": now, "data": new_items}
+    live_db_upsert_channels(new_items, cid)
+    prime_epg_for_channels(new_items, ACTIVE_CATEGORY_EPG_PRIME_LIMIT, "active category EPG")
     category_checks[cid] = now
     state["category_checks"] = category_checks
     total = int(changes.get("added_count", 0) or 0) + int(changes.get("removed_count", 0) or 0) + int(changes.get("changed_count", 0) or 0)
@@ -302,6 +414,11 @@ def refresh_live_category_background(cat_id: str, title: str, state: Dict[str, A
         state["high_activity_until"] = now + (2 * 60 * 60)
         state["last_category_change"] = {"category_id": cid, "title": title or "Live TV", "time": now, "changes": changes}
         log(f"Live TV category updated in background: {title or cid}, {total} changes")
+        notify(live_update_message(changes, prefix=f"{title or 'Live TV'} updated"))
+        try:
+            xbmc.executebuiltin("Container.Refresh")
+        except Exception:
+            pass
     return {"checked": True, "time": now, "category_id": cid, "title": title or "Live TV", "channel_changes": changes}
 
 
@@ -346,13 +463,15 @@ def smart_live_background_check(force: bool = False) -> Dict[str, Any]:
         if isinstance(new_categories, list):
             result["category_changes"] = compare_live_maps(live_signature_map(old_categories, True), live_signature_map(new_categories, True))
             cache[cat_url] = {"time": now, "data": new_categories}
+            live_db_upsert_categories(new_categories)
         all_streams_url = xc_api_url("player_api.php?action=get_live_streams")
         old_streams = cache.get(all_streams_url, {}).get("data") if isinstance(cache.get(all_streams_url), dict) else []
-        new_streams = http_json(all_streams_url)
+        new_streams = http_json(all_streams_url) if (force or not isinstance(old_streams, list) or not old_streams) else None
         if isinstance(new_streams, list):
             changes = compare_live_maps(live_signature_map(old_streams, False), live_signature_map(new_streams, False))
             result["channel_changes"] = changes
             cache[all_streams_url] = {"time": now, "data": new_streams}
+            live_db_upsert_channels(new_streams, "")
             old_map = live_signature_map(old_streams, False)
             new_map = live_signature_map(new_streams, False)
             changed_cat_ids = set()
@@ -370,9 +489,11 @@ def smart_live_background_check(force: bool = False) -> Dict[str, Any]:
                 state["high_activity_until"] = now + (3 * 60 * 60)
             for cid in result["changed_category_ids"][:30]:
                 _cu, streams_url = live_cache_keys_for_category(cid)
-                cache[streams_url] = {"time": now, "data": [item for item in new_streams if isinstance(item, dict) and str(item.get("category_id") or "") == str(cid)]}
+                _items = [item for item in new_streams if isinstance(item, dict) and str(item.get("category_id") or "") == str(cid)]
+                cache[streams_url] = {"time": now, "data": _items}
+                live_db_upsert_channels(_items, cid)
         else:
-            result["error"] = "Could not read latest channel list"
+            result["channel_changes"] = {"added_count": 0, "removed_count": 0, "changed_count": 0}
         save_api_cache(cache)
     except Exception as exc:
         result["error"] = str(exc)
@@ -384,14 +505,30 @@ def smart_live_background_check(force: bool = False) -> Dict[str, Any]:
     total = int(ch.get("added_count", 0) or 0) + int(ch.get("removed_count", 0) or 0) + int(ch.get("changed_count", 0) or 0)
     if total:
         log(f"Live TV playlist updated in background: {total} channel changes")
+        notify(live_update_message(ch, prefix="Bang TV channels updated"))
+        try:
+            xbmc.executebuiltin("Container.Refresh")
+        except Exception:
+            pass
     return result
+
+
+def api_cache_ttl_for_url(url: str) -> int:
+    u = str(url or "")
+    if "action=get_live_categories" in u:
+        return LIVE_CATEGORY_TTL_SECONDS
+    if "action=get_live_streams" in u:
+        return LIVE_CACHE_TTL_SECONDS
+    if "action=get_short_epg" in u or "xmltv.php" in u:
+        return EPG_TTL_SECONDS
+    return CACHE_TTL_SECONDS
 
 
 def cache_http_json(url: str, timeout: int = REQUEST_TIMEOUT) -> Any:
     cache = load_api_cache()
     now = int(time.time())
     cached = cache.get(url)
-    if isinstance(cached, dict) and now - int(cached.get("time", 0)) < CACHE_TTL_SECONDS:
+    if isinstance(cached, dict) and now - int(cached.get("time", 0)) < api_cache_ttl_for_url(url):
         return cached.get("data")
     try:
         response = SESSION.get(url, timeout=timeout)
@@ -421,7 +558,7 @@ def decode_epg_text(v: Any) -> str:
 def fetch_and_cache_epg(stream_id: Any) -> None:
     if stream_id in (None, ""):
         return
-    if metadata_get("epg", stream_id, ttl=6 * 60 * 60):
+    if metadata_get("epg", stream_id, ttl=EPG_TTL_SECONDS):
         return
     data = http_json(xc_api_url(f"player_api.php?action=get_short_epg&stream_id={quote(stream_id)}&limit=2"))
     if not isinstance(data, dict):
@@ -449,6 +586,34 @@ def fetch_and_cache_epg(stream_id: Any) -> None:
         metadata_set("epg", stream_id, {"plot": plot})
 
 
+def prime_epg_for_channels(channels: Any, limit: int = 60, label: str = "EPG") -> int:
+    """Fill short EPG cache gently in the background. Returns newly checked channel count."""
+    if not isinstance(channels, list) or not channels:
+        return 0
+    done = 0
+    seen = set()
+    for channel in channels:
+        if xbmc.Monitor().abortRequested():
+            break
+        if not isinstance(channel, dict):
+            continue
+        stream_id = channel.get("stream_id")
+        sid = str(stream_id or "").strip()
+        if not sid or sid in seen:
+            continue
+        seen.add(sid)
+        try:
+            if not metadata_get("epg", sid, ttl=EPG_TTL_SECONDS):
+                fetch_and_cache_epg(sid)
+            done += 1
+        except Exception as exc:
+            log(f"{label} prime failed for {sid}: {exc}", xbmc.LOGWARNING)
+        time.sleep(0.08)
+        if done >= int(limit or 0):
+            break
+    return done
+
+
 def startup_preload_pending() -> bool:
     return os.path.exists(STARTUP_PRELOAD_FILE)
 
@@ -468,6 +633,7 @@ def preload_startup_data() -> None:
     if not user or not pwd:
         return
     log("Startup preload started")
+    notify("Downloading Live TV channels")
     # Core menus, channels and category lists are loaded into the API cache first.
     endpoints = [
         "player_api.php",
@@ -475,24 +641,17 @@ def preload_startup_data() -> None:
         "player_api.php?action=get_live_streams",
         "player_api.php?action=get_vod_categories",
         "player_api.php?action=get_series_categories",
-        "player_api.php?action=get_vod_streams",
-        "player_api.php?action=get_series",
     ]
     live_streams = []
     for endpoint in endpoints:
         data = cache_http_json(xc_api_url(endpoint), timeout=20)
         if endpoint.endswith("get_live_streams") and isinstance(data, list):
             live_streams = data
-    # Prime a small amount of EPG in the background so it does not block metadata filling.
-    count = 0
-    for channel in live_streams[:25]:
-        if not isinstance(channel, dict):
-            continue
-        stream_id = channel.get("stream_id")
-        fetch_and_cache_epg(stream_id)
-        count += 1
-        time.sleep(0.15)
+            live_db_upsert_channels(live_streams, "")
+    notify("Live TV cached. Downloading EPG in background")
+    count = prime_epg_for_channels(live_streams, STARTUP_EPG_PRIME_LIMIT, "startup EPG")
     clear_startup_preload()
+    notify(f"Bang TV ready. Live TV cached, EPG primed for {count} channels")
     log(f"Startup preload finished, EPG primed for {count} channels")
 
 
@@ -568,18 +727,22 @@ def run() -> None:
     monitor = xbmc.Monitor()
     log("Background metadata service started")
     while not monitor.abortRequested():
-        if not setting_bool("background_metadata_service", True) or not setting_bool("enhanced_metadata", True):
+        if not setting_bool("background_metadata_service", True):
             monitor.waitForAbort(IDLE_SLEEP)
             continue
         user, pwd = get_creds()
         if not user or not pwd:
             monitor.waitForAbort(IDLE_SLEEP)
             continue
+        # Live TV and EPG maintenance must still run even when enhanced movie/series metadata is off.
+        preload_startup_data()
+        if setting_bool("live_smart_updates", True):
+            smart_live_background_check(False)
+        if not setting_bool("enhanced_metadata", True):
+            monitor.waitForAbort(IDLE_SLEEP)
+            continue
         queue = read_queue()
         if not queue:
-            preload_startup_data()
-            if setting_bool("live_smart_updates", True):
-                smart_live_background_check(False)
             monitor.waitForAbort(IDLE_SLEEP)
             continue
         # Current page metadata is more important than startup EPG/channel preload.
