@@ -233,7 +233,7 @@
 	</extension>
 </addon>
 
-<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.219" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluencewaynebuild" name="Skin Backgrounds Wayne Build" version="1.220" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
