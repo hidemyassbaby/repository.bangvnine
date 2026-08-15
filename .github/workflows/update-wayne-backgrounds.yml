@@ -2,37 +2,43 @@ name: Update Wayne Backgrounds
 
 on:
   schedule:
-    - cron: '0 11 */2 * *'  # Every 2 days at midnight NZ time (11:00 UTC)
+    - cron: '0 11 */2 * *'  # Midnight NZDT or 11:00 pm NZST
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  update-backgrounds:
+  update-wayne-backgrounds:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python 3
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-    - name: Install dependencies
-      run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests Pillow
 
-    - name: Run background update script
-      run: python3 update_wayne_backgrounds.py
+      - name: Run Wayne background update
+        run: python update_wayne_backgrounds.py
 
-    - name: Run repo XML generator script
-      run: python3 repo_xml_generator_py3.py
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Commit and push changes
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "actions@github.com"
-        git add .
-        git commit -m "Automated background update"
-        git push
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No changes were made."
+          else
+            git commit -m "Auto: Update Wayne backgrounds and compress images"
+            git push
+          fi
