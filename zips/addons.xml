@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
-<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.166" provider-name="">
+<addon id="resource.images.skinbackgrounds.xonfluenceduncanbuild" name="Skin Backgrounds Duncan Build" version="6.167" provider-name="">
 
 	<extension point="kodi.resource.images" compile="false" type="skinbackgrounds" />
 	<requires>
